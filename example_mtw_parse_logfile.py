@@ -29,8 +29,14 @@
 #  OF ARBITRATION OF THE INTERNATIONAL CHAMBER OF COMMERCE IN THE HAGUE BY ONE OR MORE 
 #  ARBITRATORS APPOINTED IN ACCORDANCE WITH SAID RULES.
 #  
+import sys
+import os #for ubuntu only
+import time
 
-import xsensdeviceapi as xda
+module_path = "/home/raquel/Documents/Xsens/xda_python/my_python3_9_venv/lib/python3.9/site-packages"
+sys.path.insert(0, module_path)
+import xsensdeviceapi.xsensdeviceapi_py39_64 as xda
+
 import time
 from threading import Lock
 
@@ -53,6 +59,9 @@ class XdaCallback(xda.XsCallback):
 if __name__ == '__main__':
     print("Creating XsControl object...")
     control = xda.XsControl_construct()
+    if control is None:
+        print("Failed to construct XsControl instance.")
+        sys.exit(1)
     assert(control != 0)
 
     xdaVersion = xda.XsVersion()
@@ -61,19 +70,21 @@ if __name__ == '__main__':
 
     try:
         print("Opening log file...")
-        logfileName = "logfile.mtb"
+        logfileName = "logfile1.mtb"
         if not control.openLogFile(logfileName):
             raise RuntimeError("Failed to open log file. Aborting.")
         print("Opened log file: %s" % logfileName)
 
-        deviceIdArray = control.mainDeviceIds()
+        deviceIdArray = control.deviceIds()
         for i in range(deviceIdArray.size()):
-            if deviceIdArray[i].isMti() or deviceIdArray[i].isMtig():
+            print("test")
+            if deviceIdArray[i].isMtw():
+                print("found")
                 mtDevice = deviceIdArray[i]
                 break
 
         if not mtDevice:
-            raise RuntimeError("No MTi device found. Aborting.")
+            raise RuntimeError("No MTw device found. Aborting.")
 
         # Get the device object
         device = control.device(mtDevice)
@@ -82,14 +93,14 @@ if __name__ == '__main__':
         print("Device: %s, with ID: %s found in file" % (device.productCode(), device.deviceId().toXsString()))
 
         # Create and attach callback handler to device
-        callback = XdaCallback()
-        device.addCallbackHandler(callback)
+        #callback = XdaCallback()
+        #device.addCallbackHandler(callback)
 
         # By default XDA does not retain data for reading it back.
         # By enabling this option XDA keeps the buffered data in a cache so it can be accessed 
         # through XsDevice::getDataPacketByIndex or XsDevice::takeFirstDataPacketInQueue
-        device.setOptions(xda.XSO_RetainBufferedData, xda.XSO_None);
-
+        device.setOptions(xda.XSO_RetainBufferedData, xda.XSO_None)
+    
         # Load the log file and wait until it is loaded
         # Wait for logfile to be fully loaded, there are three ways to do this:
         # - callback: Demonstrated here, which has loading progress information
@@ -100,7 +111,10 @@ if __name__ == '__main__':
 
         print("Loading the file...")
         device.loadLogFile()
-        while callback.progress() != 100:
+        #while callback.progress() != 100:
+        #    print("Loading progress: %d%%" % callback.progress())
+        #    time.sleep(1)
+        while device.isLoadLogFileInProgress():
             time.sleep(0)
         print("File is fully loaded")
 
@@ -110,51 +124,38 @@ if __name__ == '__main__':
 
         # Export the data
         print("Exporting the data...")
-        s = ''
+        
+        # Header
+        s = "PacketCounter	SampleTimeFine	Year	Month	Day	Second	UTC_Nano	UTC_Year	UTC_Month	UTC_Day	UTC_Hour	UTC_Minute	UTC_Second	UTC_Valid	Acc_X	Acc_Y	Acc_Z	Mat[1][1]	Mat[2][1]	Mat[3][1]	Mat[1][2]	Mat[2][2]	Mat[3][2]	Mat[1][3]	Mat[2][3]	Mat[3][3]"
+        s += "\n"
+
         index = 0
         while index < packetCount:
             # Retrieve a packet
             packet = device.getDataPacketByIndex(index)
 
+            s += str(index) + "\t"
+
             if packet.containsCalibratedData():
                 acc = packet.calibratedAcceleration()
-                s += "Acc X: %.2f" % acc[0] + ", Acc Y: %.2f" % acc[1] + ", Acc Z: %.2f" % acc[2]
+                s += "\t" + str(acc[0]) + "\t" +  str(acc[1]) + "\t"+ str(acc[2])
 
-                gyr = packet.calibratedGyroscopeData()
-                s += " |Gyr X: %.2f" % gyr[0] + ", Gyr Y: %.2f" % gyr[1] + ", Gyr Z: %.2f" % gyr[2]
-
-                mag = packet.calibratedMagneticField()
-                s += " |Mag X: %.2f" % mag[0] + ", Mag Y: %.2f" % mag[1] + ", Mag Z: %.2f" % mag[2]
 
             if packet.containsOrientation():
-                quaternion = packet.orientationQuaternion()
-                s += "q0: %.2f" % quaternion[0] + ", q1: %.2f" % quaternion[1] + ", q2: %.2f" % quaternion[2] + ", q3: %.2f " % quaternion[3]
-
-                euler = packet.orientationEuler()
-                s += " |Roll: %.2f" % euler.x() + ", Pitch: %.2f" % euler.y() + ", Yaw: %.2f " % euler.z()
-
-            if packet.containsLatitudeLongitude():
-                latlon = packet.latitudeLongitude()
-                s += " |Lat: %7.2f" % latlon[0] + ", Lon: %7.2f " % latlon[1]
-
-            if packet.containsAltitude():
-                s += " |Alt: %7.2f " % packet.altitude()
-
-            if packet.containsVelocity():
-                vel = packet.velocity(xda.XDI_CoordSysEnu)
-                s += " |E: %7.2f" % vel[0] + ", N: %7.2f" % vel[1] + ", U: %7.2f " % vel[2]
+                matrix = packet.orientationMatrix()
+                s += "\t" + str(matrix[0][0]) + "\t" + str(matrix[1][0]) + "\t" + str(matrix[2][0]) + "\t" + str(matrix[0][1]) + "\t" + str(matrix[1][1]) + "\t" + str(matrix[2][1]) + "\t" + str(matrix[0][2]) + "\t" + str(matrix[1][2]) + "\t" + str(matrix[2][2])
 
             s += "\n"
 
             index += 1
 
-        exportFileName = "exportfile.txt"
+        exportFileName = device.deviceId().toXsString() + ".txt"
         with open(exportFileName, "w") as outfile:
             outfile.write(s)
         print("File is exported to: %s" % exportFileName)
 
         print("Removing callback handler...")
-        device.removeCallbackHandler(callback)
+        #device.removeCallbackHandler(callback)
 
         print("Closing XsControl object...")
         control.close()

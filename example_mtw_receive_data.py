@@ -239,7 +239,7 @@ if __name__ == '__main__':
             mtw_devices[i].addCallbackHandler(mtw_callbacks[i])
 
         print("Creating a log file...")
-        logFileName = "logfile.mtb"
+        logFileName = "logfile1.mtb"
         if wireless_master_device.createLogFile(logFileName) != xda.XRV_OK:
             raise RuntimeError("Failed to create a log file. Aborting.")
         else:
