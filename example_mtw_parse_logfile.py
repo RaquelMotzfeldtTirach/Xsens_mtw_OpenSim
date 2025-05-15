@@ -41,7 +41,7 @@ import time
 from threading import Lock
 import argparse
 
-def parsing_device(control, mtDevice, startTime, logfileName, dir_name):
+def parsing_device(control, mtDevice, startTime, logfileName, dirName):
         # Get the device object
         device = control.device(mtDevice)
         assert(device != 0)
@@ -102,12 +102,13 @@ def parsing_device(control, mtDevice, startTime, logfileName, dir_name):
             index += 1
 
         exportFileName = logfileName.removesuffix('.mtb') + "-000_" + device.deviceId().toXsString() + ".txt"
-        exportFileName = os.path.join(dir_name, exportFileName)
+        exportFileName = os.path.join(dirName, exportFileName)
 
         with open(exportFileName, "w") as outfile:
             outfile.write(s)
         print("File is exported to: %s" % exportFileName)
-        device.closeLogFile()
+        device = None
+        mtDevice = None
 
 
 
@@ -125,8 +126,8 @@ def mtw_parsing(fileName, startTime):
     print("Using XDA version %s" % xdaVersion.toXsString())
 
     # Making a folder for the files
-    dir_name = fileName.removesuffix('.mtb')
-    os.makedirs(dir_name, exist_ok=True)
+    dirName = fileName.removesuffix('.mtb')
+    os.makedirs(dirName, exist_ok=True)
 
     try:
         print("Opening log file...")
@@ -139,7 +140,7 @@ def mtw_parsing(fileName, startTime):
         for i in range(deviceIdArray.size()):
             if deviceIdArray[i].isMtw():
                 mtDevice = deviceIdArray[i]
-                parsing_device(control, mtDevice, startTime, logfileName, dir_name)
+                parsing_device(control, mtDevice, startTime, logfileName, dirName)
 
         if not mtDevice:
             raise RuntimeError("No MTw device found. Aborting.")
