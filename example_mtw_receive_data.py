@@ -26,18 +26,16 @@ import os #for ubuntu only
 import time
 from collections import deque
 from threading import Lock
+from termios import tcflush, TCIFLUSH
 
 #---------Ubuntu may need to set up the pacakge location for XDA and keyboard-----#
 module_path = "/home/raquel/Documents/Xsens/xda_python/my_python3_9_venv/lib/python3.9/site-packages"
 sys.path.insert(0, module_path)
 import xsensdeviceapi.xsensdeviceapi_py39_64 as xda
 #---------------------------------------------------------------------------------#
-#import xsensdeviceapi as xda #for windows only
-import keyboard
 
-#remove the added path after importing(optional)
-#sys.path.pop(0)
-
+import keyboard 
+from example_mtw_parse_logfile import mtw_parsing
 
 
 class XsPortInfoStr:
@@ -130,7 +128,7 @@ class MtwCallback(xda.XsCallback):
 
 
 if __name__ == '__main__':
-    desired_update_rate = 100  # Hz
+    desired_update_rate = 120  # Hz
     desired_radio_channel = 19
 
     wireless_master_callback = WirelessMasterCallback()
@@ -215,7 +213,7 @@ if __name__ == '__main__':
                 connected_mtw_count = next_count
 
             wait_for_connections = not keyboard.is_pressed('y')
-
+        tcflush(sys.stdin, TCIFLUSH)
 
 
         print("Starting measurement...")
@@ -239,7 +237,11 @@ if __name__ == '__main__':
             mtw_devices[i].addCallbackHandler(mtw_callbacks[i])
 
         print("Creating a log file...")
-        logFileName = "logfile1.mtb"
+        trial_nb = input("Please enter the trial number with three digits: ")
+        if not trial_nb:
+            print("No trial number provided. Using default value: 000")
+            trial_nb = "000"
+        logFileName = "MT_01200627-" + trial_nb + ".mtb"
         if wireless_master_device.createLogFile(logFileName) != xda.XRV_OK:
             raise RuntimeError("Failed to create a log file. Aborting.")
         else:
@@ -266,6 +268,7 @@ if __name__ == '__main__':
 
         euler_data = [xda.XsEuler()] * len(mtw_callbacks)
         print_counter = 0
+        start_time = time.time()
         while not user_input_ready():
             time.sleep(0)
 
@@ -309,5 +312,10 @@ if __name__ == '__main__':
     print("Deleting mtw callbacks...")
 
     print("Successful exit.")
-    print("Press [ENTER] to continue.")
+    print("Press [ENTER] to continue and parse the collected data.")
     input()
+
+    print("Parsing the collected data...")
+    # Parse the log file
+    mtw_parsing(logFileName, start_time)
+

@@ -30,7 +30,7 @@
 #  ARBITRATORS APPOINTED IN ACCORDANCE WITH SAID RULES.
 #  
 import sys
-import os #for ubuntu only
+import os 
 import time
 
 module_path = "/home/raquel/Documents/Xsens/xda_python/my_python3_9_venv/lib/python3.9/site-packages"
@@ -39,62 +39,14 @@ import xsensdeviceapi.xsensdeviceapi_py39_64 as xda
 
 import time
 from threading import Lock
+import argparse
 
-
-class XdaCallback(xda.XsCallback):
-    def __init__(self):
-        xda.XsCallback.__init__(self)
-        self.m_progress = 0
-        self.m_lock = Lock()
-
-    def progress(self):
-        return self.m_progress
-
-    def onProgressUpdated(self, dev, current, total, identifier):
-        self.m_lock.acquire()
-        self.m_progress = current
-        self.m_lock.release()
-
-
-if __name__ == '__main__':
-    print("Creating XsControl object...")
-    control = xda.XsControl_construct()
-    if control is None:
-        print("Failed to construct XsControl instance.")
-        sys.exit(1)
-    assert(control != 0)
-
-    xdaVersion = xda.XsVersion()
-    xda.xdaVersion(xdaVersion)
-    print("Using XDA version %s" % xdaVersion.toXsString())
-
-    try:
-        print("Opening log file...")
-        logfileName = "logfile1.mtb"
-        if not control.openLogFile(logfileName):
-            raise RuntimeError("Failed to open log file. Aborting.")
-        print("Opened log file: %s" % logfileName)
-
-        deviceIdArray = control.deviceIds()
-        for i in range(deviceIdArray.size()):
-            print("test")
-            if deviceIdArray[i].isMtw():
-                print("found")
-                mtDevice = deviceIdArray[i]
-                break
-
-        if not mtDevice:
-            raise RuntimeError("No MTw device found. Aborting.")
-
+def parsing_device(control, mtDevice, startTime, logfileName, dir_name):
         # Get the device object
         device = control.device(mtDevice)
         assert(device != 0)
 
         print("Device: %s, with ID: %s found in file" % (device.productCode(), device.deviceId().toXsString()))
-
-        # Create and attach callback handler to device
-        #callback = XdaCallback()
-        #device.addCallbackHandler(callback)
 
         # By default XDA does not retain data for reading it back.
         # By enabling this option XDA keeps the buffered data in a cache so it can be accessed 
@@ -106,14 +58,9 @@ if __name__ == '__main__':
         # - callback: Demonstrated here, which has loading progress information
         # - waitForLoadLogFileDone: Blocking function, returning when file is loaded
         # - isLoadLogFileInProgress: Query function, used to query the device if the loading is done
-        #
-        # The callback option is used here.
 
         print("Loading the file...")
         device.loadLogFile()
-        #while callback.progress() != 100:
-        #    print("Loading progress: %d%%" % callback.progress())
-        #    time.sleep(1)
         while device.isLoadLogFileInProgress():
             time.sleep(0)
         print("File is fully loaded")
@@ -126,7 +73,12 @@ if __name__ == '__main__':
         print("Exporting the data...")
         
         # Header
-        s = "PacketCounter	SampleTimeFine	Year	Month	Day	Second	UTC_Nano	UTC_Year	UTC_Month	UTC_Day	UTC_Hour	UTC_Minute	UTC_Second	UTC_Valid	Acc_X	Acc_Y	Acc_Z	Mat[1][1]	Mat[2][1]	Mat[3][1]	Mat[1][2]	Mat[2][2]	Mat[3][2]	Mat[1][3]	Mat[2][3]	Mat[3][3]"
+        s = "// Start Time: " + str(startTime) + "\n"
+        s += "// Update Rate: " + str(device.updateRate()) + "Hz \n"
+        s += "// Filter Profile: human (46.1) \n"
+        s += "// Option Flags: AHS Disabled ICC Disabled \n"
+        s += "// Firmware Version: 4.0.2 \n"
+        s += "PacketCounter\tSampleTimeFine\tYear\tMonth\tDay\tSecond\tUTC_Nano\tUTC_Year\tUTC_Month\tUTC_Day\tUTC_Hour\tUTC_Minute\tUTC_Second\tUTC_Valid\tAcc_X\tAcc_Y\tAcc_Z	Mat[1][1]\tMat[2][1]\tMat[3][1]\tMat[1][2]\tMat[2][2]\tMat[3][2]\tMat[1][3]\tMat[2][3]\tMat[3][3]"
         s += "\n"
 
         index = 0
@@ -134,11 +86,11 @@ if __name__ == '__main__':
             # Retrieve a packet
             packet = device.getDataPacketByIndex(index)
 
-            s += str(index) + "\t"
+            s += str(index) + "\t\t\t\t\t\t\t\t\t\t\t\t\t\t"
 
             if packet.containsCalibratedData():
                 acc = packet.calibratedAcceleration()
-                s += "\t" + str(acc[0]) + "\t" +  str(acc[1]) + "\t"+ str(acc[2])
+                s += str(acc[0]) + "\t" +  str(acc[1]) + "\t"+ str(acc[2])
 
 
             if packet.containsOrientation():
@@ -149,20 +101,69 @@ if __name__ == '__main__':
 
             index += 1
 
-        exportFileName = device.deviceId().toXsString() + ".txt"
+        exportFileName = logfileName.removesuffix('.mtb') + "-000_" + device.deviceId().toXsString() + ".txt"
+        exportFileName = os.path.join(dir_name, exportFileName)
+
         with open(exportFileName, "w") as outfile:
             outfile.write(s)
         print("File is exported to: %s" % exportFileName)
+        device.closeLogFile()
 
-        print("Removing callback handler...")
-        #device.removeCallbackHandler(callback)
 
+
+def mtw_parsing(fileName, startTime):
+
+    print("Creating XsControl object...")
+    control = xda.XsControl_construct()
+    if control is None:
+        print("Failed to construct XsControl instance.")
+        sys.exit(1)
+    assert(control != 0)
+
+    xdaVersion = xda.XsVersion()
+    xda.xdaVersion(xdaVersion)
+    print("Using XDA version %s" % xdaVersion.toXsString())
+
+    # Making a folder for the files
+    dir_name = fileName.removesuffix('.mtb')
+    os.makedirs(dir_name, exist_ok=True)
+
+    try:
+        print("Opening log file...")
+        logfileName = fileName
+        if not control.openLogFile(logfileName):
+            raise RuntimeError("Failed to open log file. Aborting.")
+        print("Opened log file: %s" % logfileName)
+
+        deviceIdArray = control.deviceIds()
+        for i in range(deviceIdArray.size()):
+            if deviceIdArray[i].isMtw():
+                mtDevice = deviceIdArray[i]
+                parsing_device(control, mtDevice, startTime, logfileName, dir_name)
+
+        if not mtDevice:
+            raise RuntimeError("No MTw device found. Aborting.")
+        
         print("Closing XsControl object...")
         control.close()
-
+    
     except RuntimeError as error:
         print(error)
     except:
         print("An unknown fatal error has occured. Aborting.")
     else:
         print("Successful exit.")
+
+
+
+if __name__ == '__main__':
+    # Create the argument parser
+    parser = argparse.ArgumentParser(description="Process Xsens mtb files.")
+    parser.add_argument('mtbFile', type=str, help='The mtb file to process (e.g., MT_01200627-000.mtb).')
+    parser.add_argument('startTime', type=float, help='The start time of the recording.')
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # Pass the logfile name to the main function
+    mtw_parsing(args.mtbFile, args.startTime)
