@@ -110,6 +110,7 @@ def parsing_device(control, mtDevice, startTime, logfileName, dirName):
 
         with open(exportFileName, "w") as outfile:
             outfile.write(s)
+        os.chmod(exportFileName, 0o666)
         print("File is exported to: %s" % exportFileName)
         
         print("Closing log file...")
@@ -138,6 +139,8 @@ def mtw_parsing(fileName, startTime):
     # Making a folder for the files
     dirName = fileName.removesuffix('.mtb')
     os.makedirs(dirName, exist_ok=True)
+    os.chmod(dirName, 0o775)
+
 
     try:
         print("Opening log file...")

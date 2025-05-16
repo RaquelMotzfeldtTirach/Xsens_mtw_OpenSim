@@ -170,21 +170,6 @@ if __name__ == '__main__':
         print("Attaching callback handler...")
         wireless_master_device.addCallbackHandler(wireless_master_callback)
 
-        print("Getting the list of the supported update rates...")
-        supportUpdateRates = xda.XsDevice.supportedUpdateRates(wireless_master_device, xda.XDI_None)
-
-        print("Supported update rates: ", end="")
-        for rate in supportUpdateRates:
-            print(rate, end=" ")
-        print()
-
-        new_update_rate = find_closest_update_rate(supportUpdateRates, desired_update_rate)
-
-        print(f"Setting update rate to {new_update_rate} Hz...")
-
-        if not wireless_master_device.setUpdateRate(new_update_rate):
-            raise RuntimeError(f"Failed to set update rate: {wireless_master_device}")
-
         print("Disabling radio channel if previously enabled...")
 
         if wireless_master_device.isRadioEnabled():
@@ -216,9 +201,36 @@ if __name__ == '__main__':
         tcflush(sys.stdin, TCIFLUSH)
 
         # Check that the update rate is set correctly
+        print("Getting the list of the supported update rates...")
+        supportUpdateRates = xda.XsDevice.supportedUpdateRates(wireless_master_device, xda.XDI_None)
+
+        print("Supported update rates: ", end="")
+        for rate in supportUpdateRates:
+            print(rate, end=" ")
+        print()
+
+        print(f"Since there are {connected_mtw_count} MTWs connected, the supported update rates are: ", end="")
+        if connected_mtw_count <= 5:
+            new_supportUpdateRates = supportUpdateRates
+        elif connected_mtw_count <= 9:
+            new_supportUpdateRates = supportUpdateRates[1:]
+        elif connected_mtw_count == 10:
+            new_supportUpdateRates = supportUpdateRates[2:]
+        elif connected_mtw_count <= 20:
+            new_supportUpdateRates = supportUpdateRates[3:]
+        elif connected_mtw_count <= 32: 
+            new_supportUpdateRates = supportUpdateRates[4:]
+        for rate in new_supportUpdateRates:
+            print(rate, end=" ")
+        print()
+
+        new_update_rate = find_closest_update_rate(new_supportUpdateRates, desired_update_rate)
+
+        print(f"Setting update rate to {new_update_rate} Hz...")
+
         if not wireless_master_device.setUpdateRate(new_update_rate):
             raise RuntimeError(f"Failed to set update rate: {wireless_master_device}")
-        print("Confirm update rate set to %d Hz" % wireless_master_device.updateRate())
+
 
         print("Starting measurement...")
         if not wireless_master_device.gotoMeasurement():
