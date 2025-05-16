@@ -241,7 +241,7 @@ if __name__ == '__main__':
         if not trial_nb:
             print("No trial number provided. Using default value: 000")
             trial_nb = "000"
-        logFileName = "MT_01200627-" + trial_nb + ".mtb"
+        logFileName = "recordings/MT_01200627-" + trial_nb + ".mtb"
         if wireless_master_device.createLogFile(logFileName) != xda.XRV_OK:
             raise RuntimeError("Failed to create a log file. Aborting.")
         else:

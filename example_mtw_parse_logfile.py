@@ -47,6 +47,8 @@ def parsing_device(control, mtDevice, startTime, logfileName, dirName):
         assert(device != 0)
 
         print("Device: %s, with ID: %s found in file" % (device.productCode(), device.deviceId().toXsString()))
+        #print("filter enabled? ", device.isSoftwareFilteringEnabled())
+        print("Filter type: %s" % device.xdaFilterProfile().toXsString())
 
         # By default XDA does not retain data for reading it back.
         # By enabling this option XDA keeps the buffered data in a cache so it can be accessed 
@@ -68,6 +70,8 @@ def parsing_device(control, mtDevice, startTime, logfileName, dirName):
 
         # Get total number of samples
         packetCount = device.getDataPacketCount()
+        print("Total number of samples: %d" % packetCount)
+        
 
         # Export the data
         print("Exporting the data...")
@@ -75,7 +79,7 @@ def parsing_device(control, mtDevice, startTime, logfileName, dirName):
         # Header
         s = "// Start Time: " + str(startTime) + "\n"
         s += "// Update Rate: " + str(device.updateRate()) + "Hz \n"
-        s += "// Filter Profile: human (46.1) \n"
+        s += "// Filter Profile: " + device.xdaFilterProfile().toXsString() +"\n"
         s += "// Option Flags: AHS Disabled ICC Disabled \n"
         s += "// Firmware Version: 4.0.2 \n"
         s += "PacketCounter\tSampleTimeFine\tYear\tMonth\tDay\tSecond\tUTC_Nano\tUTC_Year\tUTC_Month\tUTC_Day\tUTC_Hour\tUTC_Minute\tUTC_Second\tUTC_Valid\tAcc_X\tAcc_Y\tAcc_Z	Mat[1][1]\tMat[2][1]\tMat[3][1]\tMat[1][2]\tMat[2][2]\tMat[3][2]\tMat[1][3]\tMat[2][3]\tMat[3][3]"
@@ -101,14 +105,20 @@ def parsing_device(control, mtDevice, startTime, logfileName, dirName):
 
             index += 1
 
-        exportFileName = logfileName.removesuffix('.mtb') + "-000_" + device.deviceId().toXsString() + ".txt"
+        exportFileName = logfileName.removesuffix('.mtb').removeprefix('recordings/') + "-000_" + device.deviceId().toXsString() + ".txt"
         exportFileName = os.path.join(dirName, exportFileName)
 
         with open(exportFileName, "w") as outfile:
             outfile.write(s)
         print("File is exported to: %s" % exportFileName)
-        device = None
-        mtDevice = None
+        
+        print("Closing log file...")
+        reset = device.resetLogFileReadPosition()
+        if not reset:
+            print("Failed to reset log file read position.")
+        print("Log file closed.")
+        device = 0
+        mtDevice = 0
 
 
 
@@ -142,11 +152,30 @@ def mtw_parsing(fileName, startTime):
                 mtDevice = deviceIdArray[i]
                 parsing_device(control, mtDevice, startTime, logfileName, dirName)
 
+                # I don't know why, but the XsControl object needs to be closed and re-opened
+                # to be able to open the next log file. Otherwise it will fail.
+                print("Closing XsControl object...")
+                control.close()
+
+                print("Creating new XsControl object...")
+                control = xda.XsControl_construct()
+                if control is None:
+                    print("Failed to construct XsControl instance.")
+                    sys.exit(1)
+                assert(control != 0)
+
+                xdaVersion = xda.XsVersion()
+                xda.xdaVersion(xdaVersion)
+                print("Opening log file...")
+                logfileName = fileName
+                if not control.openLogFile(logfileName):
+                    raise RuntimeError("Failed to open log file. Aborting.")
+                print("Opened log file: %s" % logfileName)
+
+
         if not mtDevice:
             raise RuntimeError("No MTw device found. Aborting.")
         
-        print("Closing XsControl object...")
-        control.close()
     
     except RuntimeError as error:
         print(error)
