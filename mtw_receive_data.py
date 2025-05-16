@@ -35,7 +35,7 @@ import xsensdeviceapi.xsensdeviceapi_py39_64 as xda
 #---------------------------------------------------------------------------------#
 
 import keyboard 
-from example_mtw_parse_logfile import mtw_parsing
+from mtw_parse_logfile import mtw_parsing
 
 
 class XsPortInfoStr:
