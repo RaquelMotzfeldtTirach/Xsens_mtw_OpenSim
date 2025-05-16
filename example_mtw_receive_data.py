@@ -215,6 +215,10 @@ if __name__ == '__main__':
             wait_for_connections = not keyboard.is_pressed('y')
         tcflush(sys.stdin, TCIFLUSH)
 
+        # Check that the update rate is set correctly
+        if not wireless_master_device.setUpdateRate(new_update_rate):
+            raise RuntimeError(f"Failed to set update rate: {wireless_master_device}")
+        print("Confirm update rate set to %d Hz" % wireless_master_device.updateRate())
 
         print("Starting measurement...")
         if not wireless_master_device.gotoMeasurement():
