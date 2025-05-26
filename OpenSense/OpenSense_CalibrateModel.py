@@ -25,9 +25,8 @@ import opensim as osim
 from math import pi
 
 # Set variables to use
-
 modelFileName = input('Please enter the model file path: ');          # The path to an input model
-modelName = input('Please enter the model name: ');                # The name of the model to be calibrated
+modelName = input('Please enter the model name and trial number: ');                # The name of the model to be calibrated
 orientationsFileName = input('Please enter the orientation sto file path: ');   # The path to orientation data for calibration 
 sensor_to_opensim_rotations = osim.Vec3(-pi/2, 0, 0);# The rotation of IMU data to the OpenSim world frame # MAYBE -90 in degrees!
 baseIMUName = 'torso_imu';                     # The base IMU is the IMU on the base body of the model that dictates the heading (forward) direction of the model.
@@ -52,6 +51,6 @@ model = imuPlacer.getCalibratedModel();
 
 # Print the calibrated model to file.
 directory = modelFileName.rpartition('/')[0];
-savingFileName = directory +'/calibrated_' + modelName + '.osim';
+savingFileName = directory +'/Calibrated_' + modelName + '.osim';
 print('Saving calibrated model to: ' + savingFileName);
 model.printToXML(savingFileName);

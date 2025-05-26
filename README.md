@@ -1,73 +1,145 @@
-Before running the MT SDK Python example, the XDA (xsensdeviceapi)
-Python interface needs to be installed using the included XDA wheel file.
-Make sure to have the correct version of python and pip are installed on your machine.
+# Xsens XDA Python Utilities and Integration with OpenSim's OpenSense
 
-Supported Python versions: 3.7.x up to 3.9.x
+This repository contains scripts, virtual environment setup, and example code for working with Xsens MTw IMU devices using the Xsens Device API (XDA) in Python. It is intended for logging, parsing, and processing IMU data from Xsens' MTw. 
+This repository also uses OpenSense's Python scripting to convert, calibrate and run inverse kinematics on the recorded IMU data. The resulting calibrated skeletal models and the inverse kinematic results are compatible with OpenSim's analyzing tools. 
 
-1. Make sure to have "wheel" installed on your machine:
+## Folder Structure
+- `mtw_receive_data.py`  
+  Script to receive live data from MTw devices.
+- `mtw_parse_logfile.py`  
+  Script to parse MTw log files and extract data.
+- `Mti_examples_for_inspiration/`  
+  Original example scripts for MTi devices, made by Xsens.
+- `my_python3_9_venv/`  
+  Python 3.9 virtual environment with required dependencies and Xsens XDA wheel installed.
+- `OpenSense/`  
+  Utilities for converting and calibrating IMU data for OpenSim's OpenSense. And inverse kinematics based on IMU data script.
+- `recordings/`  
+  Example log files, recordings and results from Xsens Mtw devices.
 
-pip install wheel
+## Requirements
+- Linux, ubuntu 24.04 (not tested on previous versions)
+- Python virtual environment with:
+    - **Python 3.7–3.9** (Python 3.9 recommended)
+    - Xsens MT SDK (with Python wheel for your platform)
+- Conda with OpenSim package
 
-2. Install xsensdeviceapi wheel:
+## Setup Instructions
 
-Located in 
-Windows: <INSTALL_FOLDER>\MTSDK\Python\x64 or Win32
-Linux: <INSTALL_FOLDER>/xsens/python
+### Python virtual environment for Xsens XDA
+1. **Create and activate a Python 3.9 virtual environment:**
+   ```sh
+   python3.9 -m venv my_python3_9_venv
+   source my_python3_9_venv/bin/activate
+   ```
 
-pip install xsensdeviceapi-<xda version>-cp<Python version>-none-<os type>.whl
+2. **Install required Python packages:**
+   ```sh
+   pip install wheel
+   ```
 
-For example (MTSDK 2021.0.0 wheel for Python 3.9 on Linux):
-pip install xsensdeviceapi-2021.0.0-cp39-none-linux_x86_64.whl or
+3. **Install the Xsens Device API wheel:**
+   Install xsensdeviceapi wheel:
+   Located in 
+   Windows: <INSTALL_FOLDER>\MTSDK\Python\x64 or Win32
+   Linux: <INSTALL_FOLDER>/xsens/python
 
-For example (MTSDK 2021.0.0 wheel for Python 3.9 on Windows):
-pip install xsensdeviceapi-2021.0.0-cp39-none-win_amd64.whl
+    pip install xsensdeviceapi-<xda version>-cp<Python version>-none-<os type>.whl
 
-3. Now you are ready to run the MT SDK in Python
+    For example (MTSDK 2021.0.0 wheel for Python 3.9 on Linux):
+    pip install /usr/local/xsens/python/xsensdeviceapi-2022.2.0-cp39-none-linux_x86_64.whl 
 
-------------------------------------------------------------------------------------
+4. **Install system dependencies:**
+   ```sh
+   sudo apt-get install libpython3.9
+   ```
 
-Important:
-On Windows, run examples from command prompt as Administrator to prevent permission issues (some examples use file operations).
+5. **Set the library path if needed:**
+   ```sh
+   export LD_LIBRARY_PATH=$(python -c "import sys; print(sys.prefix)")/lib/python3.9/site-packages
+   ```
 
-------------------------------------------------------------------------------------
+### Conda environement for OpenSense library
 
-In case your Python IDE is unable to find the xsensdeviceapi module or if the
-auto-completion does not work, try using:
+1. **Install Conda:**
+  Follow the instructions on the Anaconda website: https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html
 
-import xsensdeviceapi.xsensdeviceapi_py<Python version>_64 as xda
-instead of:
-import xsensdeviceapi as xda
+2. **Create and activate Conda environment:**
+  ```sh
+  conda create -n opensim_scripting python=3.11 numpy
+  conda activate opensim_scripting
+  ```
+3. **Libraries installation:**
+  ```sh
+  conda install conda-forge::simbody
+  conda install conda-forge::cma
+  ```
 
-For example for Python 3.9:
-import xsensdeviceapi.xsensdeviceapi_py39_64 as xda
+4. **OpenSim installation:**
+  ```sh
+  conda install -c opensim-org opensim
+  ```
 
 
+## Usage 
+- **Has to be ran from root**:
+  ```sh
+  sudo -s
+  ```
+
+- **Activate the my_python3_9_venv**:
+  ```sh
+  source xda_python/my_python3_9_venv/bin/activate
+  ```
+
+- **Receiving live data:**
+  ```sh
+  python mtw_receive_data.py
+  ```
+  The script will show in the terminal how many IMUs it was ablt to connect to. When you are happy with the number of connected IMUs, you can start the recording by writting "Y" in the terminal. 
+  You will also be asked to give the trial number.
+  You will be able to see what sampling rate has been chosen for the trial. 
+  Ctrl + C to stop the recording. The parsing is then automatically called.
+
+- **Parsing a log file:**
+  ```sh
+  python mtw_parse_logfile.py recordings/MT_01200627-000.mtb
+  ```
+
+- **Post-processing environment**:
+  ```sh
+  conda activate opensim_scripting
+  ```
+
+- **Data conversion to OpenSim compatibility**:
+  ```sh
+  python OpenSense_IMUDAtaConverter.py
+  ``` 
+  This script will ask you to give the path to the IMU mapping xml file and the folder where the IMU data is stored. 
+  It will output a number of converted motion files in .sto and will correct the timestamp with the actual computer timestamp.
+
+- **Skeletal model calibration**:
+  ```sh
+  python OpenSense_CalibrateModel.py
+  ``` 
+  This script will ask you to give the path to the skeletal OpenSim model you want to use and the name of the model and trial number. 
+  It will then output a calibrated version of that model, based on the trial data. 
+
+- **Inverse Kinemtaics based on IMU data**:
+  ```sh
+  python OpenSense_OrientationTRacking.py
+  ``` 
+  This script will ask you to give the path to the calibrated model and the converted orientation data. It will then output a folder called IKResults with the results of the inverse kinematics it ran on the provided IMU data and the error of the computation. 
 
 
-# What did we do? 
+## Troubleshooting
 
-we made a virtual environment with python 3.9 
-we installed the wheel package thing
- pip install /usr/local/xsens/python/xsensdeviceapi-2025.0.0-cp39-none-linux_x86_64.whl 
- sudo apt-get install libpython3.9
-export LD_LIBRARY_PATH=/home/raquel/Documents/Xsens/xda_python/my_python3_9_venv/lib/python3.9/site-packages/libpython3.9.so.1.0
-
-but I think the 2025 version was too new for Mtw hardware! We were looking at MTi examples ...
-
-so we did 
-python -m pip uninstall /usr/local/xsens/python/xsensdeviceapi-2025.0.0-cp39-none-linux_x86_64.whl 
-
-and then 
-pip install /usr/local/xsens/python/xsensdeviceapi-2022.2.0-cp39-none-linux_x86_64.whl 
-I couldn't find a python example for Mtw
-
-but on github: https://github.com/jiminghe/Xsens_MTw_XDA_Receive/blob/master/xdamtwreceive.py
-installed keyboard
-Changed the import to fit the linux import stuff 
-
-Got a root error, does not solve it with sudo before python
-but this solves it 
-sudo -s
-
-then re-activate the my_python3_9_venv (source xda_python/my_python3_9_venv/bin/activate)
-and then just run the code with python !! 
+- If you get import errors for `xsensdeviceapi`, try importing the versioned module directly:
+  ```python
+  import xsensdeviceapi.xsensdeviceapi_py39_64 as xda
+  ```
+- If you get permission errors on Linux, try running your shell as root:
+  ```sh
+  sudo -s
+  source my_python3_9_venv/bin/activate
+  ```
