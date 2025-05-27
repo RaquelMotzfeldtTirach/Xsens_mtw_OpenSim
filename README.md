@@ -87,6 +87,10 @@ This repository also uses OpenSense's Python scripting to convert, calibrate and
 
 
 ## Usage 
+- **Alignment of IMU orientations**:
+  Usually, after some time, the orientations drift. Therefore it's best to run Awinda's MtManager, add all IMUs into the interface and then do an Alignment of the Orientations. You can use the 3D view of the IMUs to check that the alignment worked. 
+  The results should be better because of that. 
+
 - **Has to be ran from root**:
   ```sh
   sudo -s
