@@ -230,7 +230,7 @@ if __name__ == '__main__':
 
         if not wireless_master_device.setUpdateRate(new_update_rate):
             raise RuntimeError(f"Failed to set update rate: {wireless_master_device}")
-
+        
 
         print("Starting measurement...")
         if not wireless_master_device.gotoMeasurement():
@@ -262,6 +262,11 @@ if __name__ == '__main__':
             raise RuntimeError("Failed to create a log file. Aborting.")
         else:
             print("Created a log file: %s" % logFileName)
+
+        print("Starting countdown for measurement...")
+        for i in range(10, 0, -1):
+            print(f"{i}...", end="\r")
+            time.sleep(1)
 
         print("Starting recording...")
         ready_to_record = False
