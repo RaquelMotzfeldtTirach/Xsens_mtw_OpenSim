@@ -23,6 +23,11 @@ This repository also uses OpenSense's Python scripting to convert, calibrate and
     - **Python 3.7–3.9** (Python 3.9 recommended)
     - Xsens MT SDK (with Python wheel for your platform)
 - Conda with OpenSim package
+- Xsens Mtw awinda IMUs
+
+## IMU documentation
+![1](https://github.com/user-attachments/assets/60c79a68-edf0-40b0-8eee-a99875b20d37)
+
 
 ## Setup Instructions
 
@@ -131,6 +136,9 @@ This repository also uses OpenSense's Python scripting to convert, calibrate and
   ``` 
   This script will ask you to give the path to the calibrated model and the converted orientation data. It will then output a folder called IKResults with the results of the inverse kinematics it ran on the provided IMU data and the error of the computation. 
 
+## Pipeline schematic
+
+![2](https://github.com/user-attachments/assets/c1c270ca-25f2-4c39-81e6-c264469f5882)
 
 ## Troubleshooting
 
