@@ -26,7 +26,8 @@ This repository also uses OpenSense's Python scripting to convert, calibrate and
 - Xsens Mtw awinda IMUs
 
 ## IMU documentation
-![1](https://github.com/user-attachments/assets/60c79a68-edf0-40b0-8eee-a99875b20d37)
+
+![image](https://github.com/user-attachments/assets/58dc3eb2-71ff-45ce-9bc7-078ffe64993c)
 
 
 ## Setup Instructions
@@ -142,7 +143,7 @@ This repository also uses OpenSense's Python scripting to convert, calibrate and
 
 ## Pipeline schematic
 
-![2](https://github.com/user-attachments/assets/c1c270ca-25f2-4c39-81e6-c264469f5882)
+![image](https://github.com/user-attachments/assets/a2417a8c-8b7e-48b2-8b0c-6d17291bd048)
 
 ## Troubleshooting
 
