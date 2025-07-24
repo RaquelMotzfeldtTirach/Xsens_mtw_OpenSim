@@ -165,7 +165,7 @@ if __name__ == '__main__':
 
         print("Setting config mode...")
         if not wireless_master_device.gotoConfig():
-            raise RuntimeError(f"Failed to goto config mode: {wireless_master_device}")
+            raise RuntimeError(f"Failed to go to config mode: {wireless_master_device}")
 
         print("Attaching callback handler...")
         wireless_master_device.addCallbackHandler(wireless_master_callback)
@@ -234,7 +234,7 @@ if __name__ == '__main__':
 
         print("Starting measurement...")
         if not wireless_master_device.gotoMeasurement():
-            raise RuntimeError(f"Failed to goto measurement mode: {wireless_master_device}")
+            raise RuntimeError(f"Failed to go to measurement mode: {wireless_master_device}")
 
         print("Getting XsDevice instances for all MTWs...")
         all_device_ids = control.deviceIds()
@@ -252,12 +252,17 @@ if __name__ == '__main__':
         for i in range(len(mtw_devices)):
             mtw_devices[i].addCallbackHandler(mtw_callbacks[i])
 
-        print("Creating a log file...")
-        trial_nb = input("Please enter the trial number with three digits: ")
-        if not trial_nb:
-            print("No trial number provided. Using default value: 000")
-            trial_nb = "000"
-        logFileName = "recordings/MT_01200627-" + trial_nb + ".mtb"
+        # Create a folder and a MTB file to save the keypoints
+        id = input("Enter the subject ID: ")
+        mvt_id = input("Enter the movement description: ")
+        logFileName = 'recordings/subject'+ id +'/imu_'+ mvt_id +'.mtb'
+        # Create subject## folder
+        try:
+            os.mkdir('recordings/subject'+ id)
+            print(f"Directory subject'{id}' created successfully.")
+        except FileExistsError:
+            print(f"Directory subject'{id}' already exists.")
+        # Create the log file
         if wireless_master_device.createLogFile(logFileName) != xda.XRV_OK:
             raise RuntimeError("Failed to create a log file. Aborting.")
         else:
