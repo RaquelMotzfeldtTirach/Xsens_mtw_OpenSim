@@ -41,7 +41,7 @@ import time
 from threading import Lock
 import argparse
 
-def parsing_device(control, mtDevice, startTime, logfileName, dirName):
+def parsing_device(control, mtDevice, startTime, logfileName, dirName, trial_ID):
         # Get the device object
         device = control.device(mtDevice)
         assert(device != 0)
@@ -103,9 +103,9 @@ def parsing_device(control, mtDevice, startTime, logfileName, dirName):
 
             s += "\n"
 
-            index += 1
+            index += 1 
         folderName = logfileName.removesuffix('.mtb') + '/' 
-        exportFileName = folderName + device.deviceId().toXsString() + ".txt"
+        exportFileName = folderName +  trial_ID + "_" + device.deviceId().toXsString() + ".txt"
 
         print("Exporting to file: %s" % exportFileName)
         print("Folder name: %s" % folderName)
@@ -126,7 +126,7 @@ def parsing_device(control, mtDevice, startTime, logfileName, dirName):
 
 
 
-def mtw_parsing(fileName, startTime):
+def mtw_parsing(fileName, startTime, trial_ID):
 
     print("Creating XsControl object...")
     control = xda.XsControl_construct()
@@ -156,7 +156,7 @@ def mtw_parsing(fileName, startTime):
         for i in range(deviceIdArray.size()):
             if deviceIdArray[i].isMtw():
                 mtDevice = deviceIdArray[i]
-                parsing_device(control, mtDevice, startTime, logfileName, dirName)
+                parsing_device(control, mtDevice, startTime, logfileName, dirName, trial_ID)
 
                 # I don't know why, but the XsControl object needs to be closed and re-opened
                 # to be able to open the next log file. Otherwise it will fail.
@@ -197,9 +197,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Process Xsens mtb files.")
     parser.add_argument('mtbFile', type=str, help='The mtb file to process (e.g., MT_01200627-000.mtb).')
     parser.add_argument('startTime', type=float, help='The start time of the recording.')
+    parser.add_argument('trial_ID', type=str, help='The trial ID for the recording.')
 
     # Parse the arguments
     args = parser.parse_args()
 
     # Pass the logfile name to the main function
-    mtw_parsing(args.mtbFile, args.startTime)
+    mtw_parsing(args.mtbFile, args.startTime, args.trial_ID)

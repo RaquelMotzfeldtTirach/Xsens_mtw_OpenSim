@@ -27,31 +27,39 @@
 # Import OpenSim Libraries
 import opensim as osim
 from math import pi
+import argparse
 
-# Set variables to use
-modelFileName = input('Please enter the calibrated model file path: ');                # The path to an input model
-orientationsFileName = input('Please enter the orientation sto file path: ');   # The path to orientation data for calibration 
-sensor_to_opensim_rotation = osim.Vec3(-pi/2, 0, 0); # The rotation of IMU data to the OpenSim world frame
-visualizeTracking = True;  # Boolean to Visualize the tracking simulation
-#startTime = 0;          # Start time (in seconds) of the tracking simulation. 
-#endTime = 15;              # End time (in seconds) of the tracking simulation.
-resultsDirectory = 'IKResults';
+def main(modelFileName, orientationsFileName):
+    # Set variables to use
+    sensor_to_opensim_rotation = osim.Vec3(-pi/2, 0, 0); # The rotation of IMU data to the OpenSim world frame
+    visualizeTracking = True;  # Boolean to Visualize the tracking simulation
+    #startTime = 0;          # Start time (in seconds) of the tracking simulation. 
+    #endTime = 15;              # End time (in seconds) of the tracking simulation.
+    resultsDirectory = 'IKResults';
 
-# Instantiate an InverseKinematicsTool
-imuIK = osim.IMUInverseKinematicsTool();
- 
-# Set tool properties
-imuIK.set_model_file(modelFileName);
-imuIK.set_orientations_file(orientationsFileName);
-imuIK.set_sensor_to_opensim_rotations(sensor_to_opensim_rotation)
+    # Instantiate an InverseKinematicsTool
+    imuIK = osim.IMUInverseKinematicsTool();
+    
+    # Set tool properties
+    imuIK.set_model_file(modelFileName);
+    imuIK.set_orientations_file(orientationsFileName);
+    imuIK.set_sensor_to_opensim_rotations(sensor_to_opensim_rotation)
 
-directory = orientationsFileName.rpartition('/')[0];
-resultsDirectory = directory + '/' + resultsDirectory;
-imuIK.set_results_directory(resultsDirectory)
+    directory = orientationsFileName.rpartition('/')[0];
+    resultsDirectory = directory + '/' + resultsDirectory;
+    imuIK.set_results_directory(resultsDirectory)
 
-# Set time range in seconds
-#imuIK.set_time_range(0, startTime); 
-#imuIK.set_time_range(1, endTime);   
+    # Set time range in seconds
+    #imuIK.set_time_range(0, startTime); 
+    #imuIK.set_time_range(1, endTime);   
 
-# Run IK
-imuIK.run(visualizeTracking);
+    # Run IK
+    imuIK.run(visualizeTracking);
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run OpenSense Inverse Kinematics.")
+    parser.add_argument("modelFileName", type=str, help="Calibrated model file path")
+    parser.add_argument("orientationsFileName", type=str, help="Orientation File path")
+    args = parser.parse_args()
+
+    main(args.modelFileName, args.orientationsFileName)

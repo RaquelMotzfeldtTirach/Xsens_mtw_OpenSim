@@ -23,34 +23,46 @@
 # Import OpenSim libraries
 import opensim as osim
 from math import pi
+import argparse
 
-# Set variables to use
-modelFileName = input('Please enter the model file path: ');          # The path to an input model
-modelName = input('Please enter the model name and trial number: ');                # The name of the model to be calibrated
-orientationsFileName = input('Please enter the orientation sto file path: ');   # The path to orientation data for calibration 
-sensor_to_opensim_rotations = osim.Vec3(-pi/2, 0, 0);# The rotation of IMU data to the OpenSim world frame # MAYBE -90 in degrees!
-baseIMUName = 'pelvis_imu';                     # The base IMU is the IMU on the base body of the model that dictates the heading (forward) direction of the model.
-baseIMUHeading = '-z';                           # The Coordinate Axis of the base IMU that points in the heading direction. 
-visulizeCalibration = True;                     # Boolean to Visualize the Output model
+def main(modelFileName, modelName, orientationsFileName, subject_ID, trial_ID):
 
-# Instantiate an IMUPlacer object
-imuPlacer = osim.IMUPlacer();
+    # Set variables to use
+    sensor_to_opensim_rotations = osim.Vec3(-pi/2, 0, 0);# The rotation of IMU data to the OpenSim world frame # MAYBE -90 in degrees!
+    baseIMUName = 'pelvis_imu';                     # The base IMU is the IMU on the base body of the model that dictates the heading (forward) direction of the model.
+    baseIMUHeading = '-z';                           # The Coordinate Axis of the base IMU that points in the heading direction. 
+    visulizeCalibration = True;                     # Boolean to Visualize the Output model
 
-# Set properties for the IMUPlacer
-imuPlacer.set_model_file(modelFileName);
-imuPlacer.set_orientation_file_for_calibration(orientationsFileName);
-imuPlacer.set_sensor_to_opensim_rotations(sensor_to_opensim_rotations);
-imuPlacer.set_base_imu_label(baseIMUName);
-imuPlacer.set_base_heading_axis(baseIMUHeading);
+    # Instantiate an IMUPlacer object
+    imuPlacer = osim.IMUPlacer();
 
-# Run the IMUPlacer
-imuPlacer.run(visulizeCalibration);
+    # Set properties for the IMUPlacer
+    imuPlacer.set_model_file(modelFileName);
+    imuPlacer.set_orientation_file_for_calibration(orientationsFileName);
+    imuPlacer.set_sensor_to_opensim_rotations(sensor_to_opensim_rotations);
+    imuPlacer.set_base_imu_label(baseIMUName);
+    imuPlacer.set_base_heading_axis(baseIMUHeading);
 
-# Get the model with the calibrated IMU
-model = imuPlacer.getCalibratedModel();
+    # Run the IMUPlacer
+    imuPlacer.run(visulizeCalibration);
 
-# Print the calibrated model to file.
-directory = modelFileName.rpartition('/')[0];
-savingFileName = directory +'/Calibrated_' + modelName + '.osim';
-print('Saving calibrated model to: ' + savingFileName);
-model.printToXML(savingFileName);
+    # Get the model with the calibrated IMU
+    model = imuPlacer.getCalibratedModel();
+
+    # Print the calibrated model to file.
+    directory = modelFileName.rpartition('/')[0];
+    savingFileName = directory +'/Calibrated_' + modelName + "_subject" + subject_ID + "_" + trial_ID +'.osim';
+    print('Saving calibrated model to: ' + savingFileName);
+    model.printToXML(savingFileName);
+    return savingFileName
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run OpenSense Model Calibration Script.")
+    parser.add_argument("modelFileName", type=str, help="model file path")
+    parser.add_argument("modelName", type=str, help="model name")
+    parser.add_argument("orientationsFileName", type=str, help="orientation sto file path")
+    parser.add_argument("subject_ID", type=str, help="subject ID")
+    parser.add_argument("trial_ID", type=str, help="trial ID (movement name)")
+    args = parser.parse_args()
+
+    main(args.modelFileName, args.modelName, args.orientationsFileName)

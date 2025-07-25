@@ -343,7 +343,7 @@ if __name__ == '__main__':
 
     print("Parsing the collected data...")
     # Parse the log file
-    mtw_parsing(logFileName, start_time)
+    mtw_parsing(logFileName, start_time, mvt_id)
 
     folderName = logFileName.removesuffix('.mtb') + '/' 
     print("Data saved to " + folderName)

@@ -99,7 +99,7 @@ This repository also uses OpenSense's Python scripting to convert, calibrate and
 
 - **Activate the my_python3_9_venv**:
   ```sh
-  source xda_python/my_python3_9_venv/bin/activate
+  source my_python3_9_venv/bin/activate
   ```
 
 - **Receiving live data:**
