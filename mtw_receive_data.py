@@ -253,7 +253,7 @@ if __name__ == '__main__':
             mtw_devices[i].addCallbackHandler(mtw_callbacks[i])
 
         # Create a folder and a MTB file to save the keypoints
-        id = input("Enter the subject ID: ")
+        id = input("Enter the subject ID (two digits): ")
         mvt_id = input("Enter the movement description: ")
         logFileName = 'recordings/subject'+ id +'/imu_'+ mvt_id +'.mtb'
         # Create subject## folder
@@ -345,3 +345,5 @@ if __name__ == '__main__':
     # Parse the log file
     mtw_parsing(logFileName, start_time)
 
+    folderName = logFileName.removesuffix('.mtb') + '/' 
+    print("Data saved to " + folderName)

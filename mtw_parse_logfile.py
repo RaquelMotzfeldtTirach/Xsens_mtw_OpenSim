@@ -104,13 +104,16 @@ def parsing_device(control, mtDevice, startTime, logfileName, dirName):
             s += "\n"
 
             index += 1
+        folderName = logfileName.removesuffix('.mtb') + '/' 
+        exportFileName = folderName + device.deviceId().toXsString() + ".txt"
 
-        exportFileName = logfileName.removesuffix('.mtb').removeprefix('recordings/') + "-000_" + device.deviceId().toXsString() + ".txt"
-        exportFileName = os.path.join(dirName, exportFileName)
+        print("Exporting to file: %s" % exportFileName)
+        print("Folder name: %s" % folderName)
+        # make folder
+        os.makedirs(os.path.dirname(folderName), exist_ok=True)
 
         with open(exportFileName, "w") as outfile:
             outfile.write(s)
-        os.chmod(exportFileName, 0o666)
         print("File is exported to: %s" % exportFileName)
         
         print("Closing log file...")
