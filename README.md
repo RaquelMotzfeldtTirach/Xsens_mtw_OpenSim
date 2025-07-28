@@ -91,9 +91,15 @@ This repository also uses OpenSense's Python scripting to convert, calibrate and
 - **Alignment of IMU orientations**:
   Usually, after some time, the orientations drift. Therefore it's best to run Awinda's MtManager, add all IMUs into the interface and then do an Alignment of the Orientations. You can use the 3D view of the IMUs to check that the alignment worked. 
   The results should be better because of that. 
+  ```sh
+  cd Documents/Xsens/MT_Software_Suite_linux-x64_2025.0/mtmanager/linux-x64/bin
+  ./mtmanager
+
+  ```
 
 - **Has to be ran from root**:
   ```sh
+  cd xda_python
   sudo -s
   ```
 
@@ -116,30 +122,24 @@ This repository also uses OpenSense's Python scripting to convert, calibrate and
   python mtw_parse_logfile.py recordings/MT_01200627-000.mtb
   ```
 
+- **Deactivate python virtual environment:**
+  ```sh
+  deactivate
+  ```
+
 - **Post-processing environment**:
   ```sh
   conda activate opensim_scripting
   ```
 
-- **Data conversion to OpenSim compatibility**:
+- **OpenSense library**:
   ```sh
-  python OpenSense_IMUDAtaConverter.py
+  python OpenSense/OpenSense_PostProcessing.py
   ``` 
-  This script will ask you to give the path to the IMU mapping xml file and the folder where the IMU data is stored. 
-  It will output a number of converted motion files in .sto and will correct the timestamp with the actual computer timestamp.
-
-- **Skeletal model calibration**:
-  ```sh
-  python OpenSense_CalibrateModel.py
-  ``` 
-  This script will ask you to give the path to the skeletal OpenSim model you want to use and the name of the model and trial number. 
-  It will then output a calibrated version of that model, based on the trial data. 
-
-- **Inverse Kinemtaics based on IMU data**:
-  ```sh
-  python OpenSense_OrientationTRacking.py
-  ``` 
-  This script will ask you to give the path to the calibrated model and the converted orientation data. It will then output a folder called IKResults with the results of the inverse kinematics it ran on the provided IMU data and the error of the computation. 
+  This script will call three other script that do the following:
+  - Data conversion to OpenSim compatibility: This script will ask you to give the path to the IMU mapping xml file and the folder where the IMU data is stored. It will output a number of converted motion files in .sto and will correct the timestamp with the actual computer timestamp.
+  - Skeletal model calibration: This script will ask you to give the path to the skeletal OpenSim model you want to use and the name of the model and trial number. It will then output a calibrated version of that model, based on the trial data. 
+  - Inverse Kinemtaics based on IMU data: This script will ask you to give the path to the calibrated model and the converted orientation data. It will then output a folder called IKResults with the results of the inverse kinematics it ran on the provided IMU data and the error of the computation. 
 
 ## Pipeline schematic
 

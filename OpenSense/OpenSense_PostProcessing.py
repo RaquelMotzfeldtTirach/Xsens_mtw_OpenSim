@@ -15,7 +15,7 @@ def main():
     calibrated_model_path = calibrate_model(model_path, model_name, orientation_file, subject_ID, trial_ID)
 
     # Track orientation
-    track_orientation(subject_ID, trial_ID)
+    track_orientation(calibrated_model_path, orientation_file)
 
 if __name__ == "__main__":
     main()

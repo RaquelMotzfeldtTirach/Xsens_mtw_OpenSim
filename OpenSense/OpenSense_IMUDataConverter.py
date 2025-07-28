@@ -35,10 +35,10 @@ import argparse
 # Build an Xsens Settings Object. 
 # Instantiate the Reader Settings Class
 
-def main(trial_ID, subject_ID):
+def main(subject_ID, trial_ID):
     usualMapping = input('Are you using the usual IMU Mappings file? (y/n): ')
     if usualMapping.lower() == 'y':
-        mappingFile = 'defaultIMUMappings.xml'
+        mappingFile = "OpenSense/defaultIMUMappings.xml"
     else:
         mappingFile = input('Please enter the IMU Mappings file path (e.g. IMUMappings.xml): ')
 

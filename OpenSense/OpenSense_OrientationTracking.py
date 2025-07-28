@@ -30,6 +30,8 @@ from math import pi
 import argparse
 
 def main(modelFileName, orientationsFileName):
+    print(modelFileName)
+    print(orientationsFileName)
     # Set variables to use
     sensor_to_opensim_rotation = osim.Vec3(-pi/2, 0, 0); # The rotation of IMU data to the OpenSim world frame
     visualizeTracking = True;  # Boolean to Visualize the tracking simulation
@@ -54,7 +56,8 @@ def main(modelFileName, orientationsFileName):
     #imuIK.set_time_range(1, endTime);   
 
     # Run IK
-    imuIK.run(visualizeTracking);
+    #imuIK.run(visualizeTracking);
+    imuIK.run()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run OpenSense Inverse Kinematics.")
