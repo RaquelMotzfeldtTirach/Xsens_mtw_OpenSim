@@ -26,6 +26,8 @@
 #
 
 # TODO:
+# clean the code
+# make the code more modular
 # add support for another camera and set of markers
 # make the weights configurable
 # make the weights individual for each marker and imu
@@ -47,25 +49,17 @@ def main(modelFileName, orientationsFileName):
     markersFileName = "recordings/subject28/imu_elbow/webcam_elbow.trc"
     
     # Weighting configuration for sensor fusion
-    marker_weight = 10.0      # Higher weight prioritizes marker data
-    orientation_weight = 0.0  # Set to ZERO to completely disable IMU orientation influence
-    constraint_var = 0.001    # IK solver constraint weight
+    marker_weight = 1000000     # Higher weight prioritizes marker data
+    orientation_weight = 1  # Set to ZERO to completely disable IMU orientation influence
+    constraint_var = 1   # IK solver constraint weight: Set the relative weighting for constraints. Use Infinity to identify the strict enforcement of constraints, otherwise any positive weighting will append the constraint errors to the assembly cost which the solver will minimize.
     
     print(f"Sensor fusion weights: Markers={marker_weight}, Orientations={orientation_weight}")
-    if orientation_weight == 0.0:
-        print("WARNING: Orientation weight set to ZERO - this will disable all IMU orientation constraints!")
-        print("This should produce results very close to marker-only IK.")
-    else:
-        print(f"This configuration prioritizes marker data over IMU orientations")
 
 
     # Set variables to use
     sensor_to_opensim_rotation = osim.Vec3(-pi/2, 0, 0); # The rotation of IMU data to the OpenSim world frame
-    visualizeTracking = True;  # Boolean to Visualize the tracking simulation
     resultsDirectory = 'IKResultsTest';
 
-    # Instantiate an InverseKinematicsTool
-    #imuIK = osim.IMUInverseKinematicsTool();
     model = osim.Model(modelFileName);  # Load the model to ensure it is valid before running the IK tool
     
     # Load markers from the markers.xml file and add them to the model
@@ -142,8 +136,34 @@ def main(modelFileName, orientationsFileName):
         markerTable = None 
         markerWeights = None
         use_markers = False
+
+    # Downsampling the orientation data to match marker timestamps test
+    downsample = True
+    if downsample and use_markers and markerTable is not None:
+        print("\n=== DOWNSAMPLING ORIENTATION DATA TO MATCH MARKER TIMESTAMPS ===")
+        
+        imu_times = quatTable.getIndependentColumn()
+        marker_times = markerTable.getIndependentColumn()
+        
+        print(f"IMU times: {len(imu_times)} samples")
+        print(f"Marker times: {len(marker_times)} samples")
+        
+        # Create a new table for downsampled orientations
+        downsampled_orientations = osim.TimeSeriesTableQuaternion()
+        downsampled_orientations.setColumnLabels(quatTable.getColumnLabels())
+        
+        # Iterate through marker timestamps and find closest IMU orientation
+        for marker_time in marker_times:
+            closest_time = min(imu_times, key=lambda t: abs(t - marker_time))
+            row = quatTable.getRowAtIndex(quatTable.getNearestRowIndexForTime(closest_time))
+            downsampled_orientations.appendRow(marker_time, row)
+        
+        # Replace quatTable with the downsampled orientations
+        quatTable = downsampled_orientations
+        
+        print(f"Downsampling complete: {quatTable.getNumRows()} rows")
     
-    # Compute rotation matrix so that (e.g. "pelvis_imu" + SimTK::ZAxis) lines up with model forward (+X)
+    # Compute rotation matrix so that (e.g. "pelvis_imu" + - Z Axis) lines up with model forward (+X)
     base_imu_label = "pelvis_imu"  # Replace with your base IMU label
     direction_on_imu = osim.CoordinateDirection(osim.CoordinateAxis(2), -1)  # Negative Z-axis direction
 
@@ -208,7 +228,7 @@ def main(modelFileName, orientationsFileName):
                                    heading_rotation_vec3.get(2)**2)
     
     # If correction is too large (> 0.3 radians ~17 degrees), apply only partial correction
-    max_correction = 0.3  # Maximum correction in radians (~17 degrees)
+    max_correction = 0.1  # Maximum correction in radians (~17 degrees)
     if correction_magnitude > max_correction:
         scale_factor = max_correction / correction_magnitude
         print(f"Large heading correction detected ({correction_magnitude*180/pi:.1f}°), applying scaled correction ({scale_factor:.2f})")
@@ -250,17 +270,6 @@ def main(modelFileName, orientationsFileName):
     else:
         oRefs = osim.OrientationsReference(orientationData);
         
-        # Try to set orientation weights to be lower than marker weights
-        # This gives markers priority in the inverse kinematics solution
-        try:
-            for i in range(oRefs.getNumFrames()):
-                oRefs.setOrientationWeightForFrame(i, orientation_weight)
-            print(f"Set orientation weight to {orientation_weight} (lower than marker weight for prioritization)")
-        except Exception as e:
-            print(f"Could not set individual orientation weights: {e}")
-            print(f"Using default orientation weights - marker priority achieved through higher marker weights ({marker_weight})")
-        
-        # Alternative approach: try to set a global orientation weight if the method exists
         try:
             if hasattr(oRefs, 'setWeight'):
                 oRefs.setWeight(orientation_weight)
@@ -270,14 +279,129 @@ def main(modelFileName, orientationsFileName):
                 print(f"Set default orientation weight to {orientation_weight}")
         except Exception as e:
             print(f"Could not set global orientation weight: {e}")
+
+    # Interpolation test
+    interpolation = False
+    if interpolation == True and use_markers and markerTable is not None:
+        print("\n=== MARKER DATA INTERPOLATION (OpenSim method) ===")
+        
+        imu_times = quatTable.getIndependentColumn()
+        marker_times = markerTable.getIndependentColumn()
+        
+        print(f"IMU times: {len(imu_times)} samples")
+        print(f"Marker times: {len(marker_times)} samples")
+        
+        # Check if we need interpolation
+        times_match = (len(imu_times) == len(marker_times) and 
+                    all(abs(imu_times[i] - marker_times[i]) < 1e-6 for i in range(len(imu_times))))
+        
+        if not times_match:
+            print("Interpolating marker data to match IMU timestamps...")
+            
+            # Create a new marker table with IMU timestamps cut to the overlapping range
+            marker_start_time = marker_times[0]
+            marker_end_time = marker_times[-1]
+            imu_start_time = imu_times[0]
+            imu_end_time = imu_times[-1]
+            start_time = max(marker_start_time, imu_start_time)
+            end_time = min(marker_end_time, imu_end_time)
+            print(f"Using overlapping time range: {start_time:.4f} to {end_time:.4f} seconds")
+            # only keep rows within the overlapping time range
+            overlapping_times = [t for t in imu_times if start_time <= t <= end_time]
+            print(f"Found {len(overlapping_times)} overlapping IMU timestamps in the range")
+
+            # Create new marker table with IMU timestamps
+            interpolated_table = osim.TimeSeriesTableVec3()
+            interpolated_table.setColumnLabels(markerTable.getColumnLabels())
+        
     
+            # Use OpenSim's interpolation on the overlapping time range
+            for imu_time in overlapping_times:
+                #try:
+                    # Get interpolated row from original table
+                    #interpolated_row = markerTable.getNearestRow(imu_time)
+                    #interpolated_table.appendRow(imu_time, interpolated_row)
+                #except:
+                    if imu_time <= marker_times[0]:
+                        # Use first row
+                        first_row = markerTable.getRowAtIndex(0)
+                        interpolated_table.appendRow(imu_time, first_row)
+                    elif imu_time >= marker_times[-1]:
+                        # Use last row  
+                        last_row = markerTable.getRowAtIndex(len(marker_times) - 1)
+                        interpolated_table.appendRow(imu_time, last_row)
+                    else:
+                                                # Find surrounding time points and interpolate
+                        for i in range(len(marker_times) - 1):
+                            if marker_times[i] <= imu_time <= marker_times[i + 1]:
+                                # Linear interpolation factor
+                                t = (imu_time - marker_times[i]) / (marker_times[i + 1] - marker_times[i])
+                                
+                                # Get surrounding rows - these are RowVectorViewVec3 objects
+                                row1 = markerTable.getRowAtIndex(i)
+                                row2 = markerTable.getRowAtIndex(i + 1)
+                                
+                                # Instead of manually creating RowVectorVec3, let's create a list of Vec3 objects
+                                interpolated_positions = []
+                                
+                                # Interpolate each marker position
+                                for j in range(row1.size()):
+                                    pos1 = row1.getElt(0, j)
+                                    pos2 = row2.getElt(0, j)
+                                    
+                                    interp_x = pos1.get(0) * (1 - t) + pos2.get(0) * t
+                                    interp_y = pos1.get(1) * (1 - t) + pos2.get(1) * t
+                                    interp_z = pos1.get(2) * (1 - t) + pos2.get(2) * t
+                                    
+                                    interp_pos = osim.Vec3(interp_x, interp_y, interp_z)
+                                    interpolated_positions.append(interp_pos)
+                                
+                                # Create RowVectorVec3 from the list of positions
+                                try:
+                                    # Method 1: Try creating from a list/array
+                                    interp_row = osim.RowVectorVec3()
+                                    for pos in interpolated_positions:
+                                        interp_row.append(pos)
+                                except:
+                                    try:
+                                        # Method 2: Try creating with size and setting elements differently
+                                        interp_row = osim.RowVectorVec3(len(interpolated_positions))
+                                        for k, pos in enumerate(interpolated_positions):
+                                            # Try different ways to set the element
+                                            try:
+                                                interp_row.set(k, pos)  # Try set method
+                                            except:
+                                                try:
+                                                    interp_row[k] = pos  # Try bracket notation
+                                                except:
+                                                    print(f"Cannot set element {k} in RowVectorVec3")
+                                                    break
+                                    except Exception as e:
+                                        print(f"Failed to create interpolated row: {e}")
+                                        # Skip this interpolation
+                                        continue
+                                
+                                # Add the interpolated row to the table
+                                interpolated_table.appendRow(imu_time, interp_row)
+                                break
+                    
+            # Replace original table with interpolated one, but cut off using the max start and min end times from both tables
+            markerTable = interpolated_table
+            print(f"Interpolation complete: {markerTable.getNumRows()} rows")
+
+        else:
+            print("Timestamps already match - no interpolation needed")
+        
+        print("=== INTERPOLATION COMPLETE ===\n")
+
+        
     # Create MarkersReference from loaded marker data (following C++ InverseKinematicsTool pattern)
-    if use_markers and markerTable is not None and markerWeights is not None:
+    if use_markers and markerTable is not None and markerWeights is not None and marker_weight > 0.0:
         try:
-            # Initialize MarkersReference from marker file with weights
+            # Initialize MarkersReference from markerTable with weights
             mRefs = osim.MarkersReference()
             mRefs.initializeFromMarkersFile(markersFileName, markerWeights)
-            
+
             # Get marker table and print marker info (use the loaded markerTable instead of mRefs methods)
             print(f"Created MarkersReference with {markerWeights.getSize()} markers")
             print(f"Markers configured for IK:")
@@ -328,12 +452,17 @@ def main(modelFileName, orientationsFileName):
     # The heading correction should handle coordinate system alignment
     print("Using IMU-driven pelvis motion without artificial constraints")
     
-    print('Argument types: ', type(model), type(oRefs), type(mRefs), type(coordinateReferences), type(constraint_var))
     ikSolver = osim.InverseKinematicsSolver(model, mRefs, oRefs, coordinateReferences, constraint_var);
-    # Set tool properties
-    #imuIK.set_model_file(modelFileName);
-    #imuIK.set_orientations_file(orientationsFileName);
-    #imuIK.set_sensor_to_opensim_rotations(sensor_to_opensim_rotation)
+    # Add this right after creating ikSolver:
+    print(f"\n=== SOLVER CONFIGURATION ANALYSIS ===")
+
+    # Check what the solver actually sees
+    print(f"Solver configuration:")
+    print(f"  - Markers reference: {mRefs.getNumFrames() if hasattr(mRefs, 'getNumFrames') else 'unknown'} frames")
+    print(f"  - Orientations reference: {len(oRefs.getTimes()) if hasattr(oRefs, 'getTimes') else 'unknown'} frames")
+
+    print("="*60)
+
 
     directory = orientationsFileName.rpartition('/')[0];
     resultsDirectory = directory + '/' + resultsDirectory;
@@ -342,7 +471,7 @@ def main(modelFileName, orientationsFileName):
     os.makedirs(resultsDirectory, exist_ok=True);
     
     # Set solver accuracy to match C++ implementation (line 234 in IMUPlacer.cpp)
-    accuracy = 1e-4  # Same as C++ implementation
+    accuracy = 1e-9  # Same as C++ implementation
     ikSolver.setAccuracy(accuracy);
     
     # Print heading correction information
@@ -393,7 +522,7 @@ def main(modelFileName, orientationsFileName):
     numTimeSteps = len(times);
     print(f"Data time range: {startTime} to {endTime} seconds");
     print(f"Number of time steps: {numTimeSteps}");
-    
+
     # Create storage for results
     storage = osim.Storage();
     storage.setName("Coordinates");
@@ -442,27 +571,79 @@ def main(modelFileName, orientationsFileName):
         # Show progress every 10 frames or at the end
         if i % 10 == 0 or i == numTimeSteps - 1:
             print(f"Processing frame {i+1}/{numTimeSteps}: {time_val:.4f}s");
-        
+            #Try to get marker errors to verify markers are being used
+            try:
+                if use_markers and marker_weight > 0:
+                    marker_errors = osim.SimTKArrayDouble()
+                    ikSolver.computeCurrentMarkerErrors(marker_errors)
+                    if marker_errors.size() > 0:
+                        total_marker_error = sum(marker_errors.getElt(j) for j in range(marker_errors.size()))
+                        avg_marker_error = total_marker_error / marker_errors.size()
+                        print(f"  Marker error: {avg_marker_error:.6f}m ({marker_errors.size()} markers)")
+                    else:
+                        print(f"  Marker error: No marker data available")
+                else:
+                    print(f"  Marker error: Markers disabled (weight={marker_weight})")
+            except Exception as e:
+                print(f"  Marker error: Cannot compute ({e})")
+            
+            
+            # Same for orientation errors
+            try:
+                if orientation_weight > 0:
+                    orientation_errors = osim.SimTKArrayDouble()
+                    ikSolver.computeCurrentOrientationErrors(orientation_errors)
+                    if orientation_errors.size() > 0:
+                        total_orientation_error = sum(orientation_errors.getElt(j) for j in range(orientation_errors.size()))
+                        avg_orientation_error = total_orientation_error / orientation_errors.size()
+                        print(f"  Orientation error: {avg_orientation_error:.6f}rad ({orientation_errors.size()} orientations)")
+                    else:
+                        print(f"  Orientation error: No orientation data available")
+                else:
+                    print(f"  Orientation error: Orientations disabled (weight={orientation_weight})")
+            except Exception as e:
+                print(f"  Orientation error: Cannot compute ({e})")
+
+
+
+            # Show weights - but only if the references have data
+            if orientation_weight > 0.0:
+                try:
+                    read_o_weights = osim.SimTKArrayDouble()
+                    oRefs.getWeights(s, read_o_weights)
+                    first_o_weight = float(read_o_weights.getElt(0))
+                    print(f"  Orientation weights: {first_o_weight}")  # Show first weight
+                except Exception as e:
+                    print(f"  Orientation weights: Cannot query (error: {e})")
+            else:
+                print(f"  Orientation weights: 0.0 (disabled)")
+            
+            if marker_weight > 0.0:
+                try:
+                    read_m_weights = osim.SimTKArrayDouble()
+                    mRefs.getWeights(s, read_m_weights)
+                    first_weight = float(read_m_weights.getElt(0))
+                    print(f"  Marker weights: {first_weight}")  # Show first weight
+                except Exception as e:
+                    print(f"  Marker weights: Cannot query (error: {e})")
+            else:
+                print(f"  Marker weights: Not using markers")
+    
+        # Check if the solver has both references properly registered
+        try:
+            # Try to get solver info
+            marker_tasks = ikSolver.getNumMarkersInUse() if hasattr(ikSolver, 'getNumMarkersInUse') else 'unknown'
+            orient_tasks = ikSolver.getNumOrientationSensorsInUse() if hasattr(ikSolver, 'getNumOrientationSensorsInUse') else 'unknown'
+            print(f"  - Solver sees {marker_tasks} marker tasks")
+            print(f"  - Solver sees {orient_tasks} orientation tasks")
+        except Exception as e:
+            print(f"  - Cannot query solver tasks: {e}")
+
         # Set the state to current time
         s.setTime(time_val);
 
         # Track for this time step (assemble is called internally by track)
         ikSolver.track(s);
-        
-        # Count marker usage for this frame
-        if use_markers and markerWeights is not None:
-            # Use the number of markers from markerWeights since that's what we loaded
-            num_available_markers = markerWeights.getSize()
-            
-            # For now, assume all markers are being used (we can't easily query the solver for this)
-            # This is a reasonable assumption since we set all marker weights to 1.0
-            num_markers_in_use = num_available_markers
-            marker_usage_count += num_markers_in_use
-            total_possible_marker_uses += num_available_markers
-            
-            # Print detailed marker usage info every 100 frames for debugging
-            if i % 100 == 0:
-                print(f"  Frame {i}: Using {num_markers_in_use}/{num_available_markers} markers")
         
         # Get coordinate values from the state and convert rotational coordinates to degrees
         coordValues = osim.Vector(numCoords, 0.0);  # Initialize with size and default value
@@ -486,31 +667,6 @@ def main(modelFileName, orientationsFileName):
     
     print(f"IK processing completed for {numTimeSteps} frames in {elapsed_time:.2f} seconds.");
     
-    # Print marker usage statistics
-    if use_markers and markerWeights is not None:
-        print(f"\n=== MARKER USAGE STATISTICS ===")
-        print(f"Total markers available: {markerWeights.getSize()}")
-        print(f"Total marker uses across all frames: {marker_usage_count}")
-        print(f"Total possible marker uses: {total_possible_marker_uses}")
-        
-        if total_possible_marker_uses > 0:
-            usage_percentage = (marker_usage_count / total_possible_marker_uses) * 100
-            print(f"Marker usage rate: {usage_percentage:.1f}%")
-            
-            avg_markers_per_frame = marker_usage_count / numTimeSteps if numTimeSteps > 0 else 0
-            print(f"Average markers used per frame: {avg_markers_per_frame:.1f}")
-        
-        # Print marker names that were configured
-        print(f"Markers configured for tracking:")
-        for i, label in enumerate(marker_labels):
-            print(f"  - {str(label)}")
-            
-        print(f"=== END MARKER STATISTICS ===\n")
-    else:
-        print(f"\n=== MARKER USAGE STATISTICS ===")
-        print(f"No markers were used (IMU-only mode)")
-        print(f"=== END MARKER STATISTICS ===\n")
-
     # Save results as .mot file
     motFileName = resultsDirectory + "/inverse_kinematics_results.mot";
     storage.printResult(storage, "inverse_kinematics_results", resultsDirectory, -1, ".mot");
