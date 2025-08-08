@@ -49,40 +49,54 @@ def main(modelFileName, orientationsFileName):
     markersFileName = "recordings/subject28/imu_elbow/webcam_elbow.trc"
     
     # Weighting configuration for sensor fusion
-    marker_weight = 1000000     # Higher weight prioritizes marker data
-    orientation_weight = 1  # Set to ZERO to completely disable IMU orientation influence
-    constraint_var = 1   # IK solver constraint weight: Set the relative weighting for constraints. Use Infinity to identify the strict enforcement of constraints, otherwise any positive weighting will append the constraint errors to the assembly cost which the solver will minimize.
+    marker_weight = 15     # Higher weight prioritizes marker data
+    orientation_weight = 100  # Set to ZERO to completely disable IMU orientation influence
+    constraint_var = 100   # IK solver constraint weight: Set the relative weighting for constraints. Use Infinity to identify the strict enforcement of constraints, otherwise any positive weighting will append the constraint errors to the assembly cost which the solver will minimize.
     
     print(f"Sensor fusion weights: Markers={marker_weight}, Orientations={orientation_weight}")
 
 
     # Set variables to use
-    sensor_to_opensim_rotation = osim.Vec3(-pi/2, 0, 0); # The rotation of IMU data to the OpenSim world frame
+    sensor_to_opensim_rotation = osim.Vec3(-pi/2, 52*pi/180, 0); # The rotation of IMU data to the OpenSim world frame
     resultsDirectory = 'IKResultsTest';
 
-    model = osim.Model(modelFileName);  # Load the model to ensure it is valid before running the IK tool
+    # model = osim.Model(modelFileName);  # Load the model to ensure it is valid before running the IK tool
     
-    # Load markers from the markers.xml file and add them to the model
-    markersFileName_xml = "OpenSense/Models/Rajagopal/markers.xml"
-    try:
-        # Load the marker set from the XML file
-        markerSet = osim.MarkerSet(markersFileName_xml)
-        print(f"Loaded {markerSet.getSize()} markers from {markersFileName_xml}")
+    # # Load markers from the markers.xml file and add them to the model
+    # markersFileName_xml = "OpenSense/Models/Rajagopal/markers.xml"
+    # try:
+    #     # Load the marker set from the XML file
+    #     markerSet = osim.MarkerSet(markersFileName_xml)
+    #     print(f"Loaded {markerSet.getSize()} markers from {markersFileName_xml}")
         
-        # Add each marker to the model
-        for i in range(markerSet.getSize()):
-            marker = markerSet.get(i)
-            model.addMarker(marker)
-            print(f"  Added marker: {marker.getName()}")
+    #     # Add each marker to the model
+    #     for i in range(markerSet.getSize()):
+    #         marker = markerSet.get(i)
+    #         model.addMarker(marker)
+    #         print(f"  Added marker: {marker.getName()}")
         
-        # Update the model connections
-        model.finalizeConnections()
-        print(f"Model now has {model.getMarkerSet().getSize()} markers")
+    #     # Update the model connections
+    #     model.finalizeConnections()
+    #     print(f"Model now has {model.getMarkerSet().getSize()} markers")
         
-    except Exception as e:
-        print(f"Warning: Could not load markers from {markersFileName_xml}: {e}")
-        print("Proceeding without model markers...")
-    
+    # except Exception as e:
+    #     print(f"Warning: Could not load markers from {markersFileName_xml}: {e}")
+    #     print("Proceeding without model markers...")
+
+    # Scale the model to match with the marker data too
+    scale_tool = osim.ScaleTool("OpenSense/scaling_setup.xml")
+    generic_model_maker = scale_tool.getGenericModelMaker()
+    print("Marker Set File Name:", generic_model_maker.getMarkerSetFileName())
+
+    static_trial = scale_tool.getModelScaler()
+    print("Model Scaler File Name:", static_trial.getMarkerFileName())
+
+    model_path = scale_tool.getGenericModelMaker().getModelFileName()
+    print("Model File Name:", model_path)
+    scale_tool.run()
+
+    model = osim.Model("OpenSense/Models/Rajagopal/Calibrated_and_scaled_Rajagopal_subject28_elbow.osim")
+
     s = model.initSystem();  # This is crucial for the model to work properly
     coordinates = model.getCoordinateSet();
     imuPlacer = osim.IMUPlacer();
@@ -168,7 +182,6 @@ def main(modelFileName, orientationsFileName):
     direction_on_imu = osim.CoordinateDirection(osim.CoordinateAxis(2), -1)  # Negative Z-axis direction
 
     # Apply sensor to OpenSim rotation first (matching C++ IMUPlacer implementation)
-    sensor_to_opensim_rotation = osim.Vec3(-pi/2, 0, 0); # The rotation of IMU data to the OpenSim world frame
     sensorToOpenSim = osim.Rotation()
     # Apply the sensor rotation sequence: X, Y, Z rotations
     rotX = osim.Rotation()
@@ -261,6 +274,14 @@ def main(modelFileName, orientationsFileName):
               f"Y={heading_rotation_vec3.get(1)*180/pi:.1f}°, "
               f"Z={heading_rotation_vec3.get(2)*180/pi:.1f}°")
     orientationData = osim.OpenSenseUtilities.convertQuaternionsToRotations(quatTable);
+
+    # OrientationWeights
+    orientationWeights = osim.OrientationWeightSet()
+    for label in orientationData.getColumnLabels():
+        orientationWeight = osim.OrientationWeight()
+        orientationWeight.setName(str(label))
+        orientationWeight.setWeight(orientation_weight)  # Use configured orientation weight
+        orientationWeights.cloneAndAppend(orientationWeight)
     
     # Create OrientationsReference with reduced weight to prioritize markers
     if orientation_weight == 0.0:
@@ -268,17 +289,8 @@ def main(modelFileName, orientationsFileName):
         print("Creating EMPTY OrientationsReference to disable all IMU orientation constraints")
         oRefs = osim.OrientationsReference()  # Empty reference - no orientation data
     else:
-        oRefs = osim.OrientationsReference(orientationData);
-        
-        try:
-            if hasattr(oRefs, 'setWeight'):
-                oRefs.setWeight(orientation_weight)
-                print(f"Set global orientation weight to {orientation_weight}")
-            elif hasattr(oRefs, 'setDefaultWeight'):
-                oRefs.setDefaultWeight(orientation_weight)
-                print(f"Set default orientation weight to {orientation_weight}")
-        except Exception as e:
-            print(f"Could not set global orientation weight: {e}")
+        oRefs = osim.OrientationsReference(orientationData, orientationWeights);
+     
 
     # Interpolation test
     interpolation = False
@@ -453,6 +465,8 @@ def main(modelFileName, orientationsFileName):
     print("Using IMU-driven pelvis motion without artificial constraints")
     
     ikSolver = osim.InverseKinematicsSolver(model, mRefs, oRefs, coordinateReferences, constraint_var);
+    
+    
     # Add this right after creating ikSolver:
     print(f"\n=== SOLVER CONFIGURATION ANALYSIS ===")
 
@@ -545,6 +559,32 @@ def main(modelFileName, orientationsFileName):
     # Use the first time from our filtered times array
     first_time = times[0]
     s.setTime(first_time);
+
+    # Add weight verification
+    print(f"\n=== WEIGHT VERIFICATION ===")
+    print(f"Configured weights: Marker={marker_weight}, Orientation={orientation_weight}")
+
+    # Check marker weights
+    if use_markers and mRefs.getNames().size() > 0:
+        try:
+            marker_weights_check = osim.SimTKArrayDouble()
+            mRefs.getWeights(s, marker_weights_check)
+            print(f"Actual marker weights: {[marker_weights_check.getElt(i) for i in range(min(3, marker_weights_check.size()))]}")
+        except Exception as e:
+            print(f"Cannot read marker weights: {e}")
+
+    # Check orientation weights  
+    if orientation_weight > 0 and oRefs.getNames().size() > 0:
+        try:
+            orient_weights_check = osim.SimTKArrayDouble()
+            oRefs.getWeights(s, orient_weights_check)
+            print(f"Actual orientation weights: {[orient_weights_check.getElt(i) for i in range(min(3, orient_weights_check.size()))]}")
+        except Exception as e:
+            print(f"Cannot read orientation weights: {e}")
+
+    print("="*60)
+
+    
     
     # Realize position before assembly (important for stability)
     model.realizePosition(s)
@@ -552,7 +592,184 @@ def main(modelFileName, orientationsFileName):
     # Assemble the model at the first time point (matching C++ line 243)
     ikSolver.assemble(s);  # Only assemble once at the beginning
     
+    
     print(f"IK Solver initialized and assembled. Starting processing...");
+
+    # Add detailed data quality analysis
+    print(f"\n=== DATA QUALITY ANALYSIS ===")
+
+    # Test solver responsiveness at first frame
+    test_time = times[0]
+    s.setTime(test_time)
+    ikSolver.track(s)
+
+    # Check errors at this time point
+    marker_perfect_fit = False
+    orientation_perfect_fit = False
+
+    if use_markers and mRefs.getNames().size() > 0:
+        try:
+            marker_errors = osim.SimTKArrayDouble()
+            ikSolver.computeCurrentMarkerErrors(marker_errors)
+            if marker_errors.size() > 0:
+                marker_error_values = [marker_errors.getElt(i) for i in range(marker_errors.size())]
+                avg_marker_error = sum(marker_error_values) / len(marker_error_values)
+                max_marker_error = max(marker_error_values)
+                min_marker_error = min(marker_error_values)
+                
+                print(f"Marker errors (meters):")
+                print(f"  - Average: {avg_marker_error:.8f}m")
+                print(f"  - Range: {min_marker_error:.8f}m to {max_marker_error:.8f}m")
+                print(f"  - All values: {[f'{e:.6f}' for e in marker_error_values[:5]]}...")  # Show first 5
+                
+                # Check if markers have near-perfect fit
+                if avg_marker_error < 1e-6:  # Less than 1 micrometer
+                    marker_perfect_fit = True
+                    print("🚨 MARKERS HAVE NEAR-PERFECT FIT - This will dominate the solution!")
+                elif avg_marker_error < 1e-4:  # Less than 0.1mm
+                    print("⚠️  Markers have very good fit - may dominate orientation data")
+                else:
+                    print("✓ Markers have reasonable errors")
+            else:
+                print("❌ No marker errors available")
+        except Exception as e:
+            print(f"❌ Cannot compute marker errors: {e}")
+
+    if orientation_weight > 0 and oRefs.getNames().size() > 0:
+        try:
+            orientation_errors = osim.SimTKArrayDouble()
+            ikSolver.computeCurrentOrientationErrors(orientation_errors)
+            if orientation_errors.size() > 0:
+                orient_error_values = [orientation_errors.getElt(i) for i in range(orientation_errors.size())]
+                avg_orient_error = sum(orient_error_values) / len(orient_error_values)
+                max_orient_error = max(orient_error_values)
+                min_orient_error = min(orient_error_values)
+                
+                print(f"Orientation errors (radians):")
+                print(f"  - Average: {avg_orient_error:.8f}rad ({avg_orient_error*180/3.14159:.6f}°)")
+                print(f"  - Range: {min_orient_error:.8f}rad to {max_orient_error:.8f}rad")
+                print(f"  - All values: {[f'{e:.6f}' for e in orient_error_values[:5]]}...")  # Show first 5
+                
+                # Check if orientations have near-perfect fit
+                if avg_orient_error < 1e-6:  # Less than 0.00006 degrees
+                    orientation_perfect_fit = True
+                    print("🚨 ORIENTATIONS HAVE NEAR-PERFECT FIT - This will dominate the solution!")
+                elif avg_orient_error < 1e-4:  # Less than 0.006 degrees
+                    print("⚠️  Orientations have very good fit - may dominate marker data")
+                else:
+                    print("✓ Orientations have reasonable errors")
+            else:
+                print("❌ No orientation errors available")
+        except Exception as e:
+            print(f"❌ Cannot compute orientation errors: {e}")
+
+    # Analyze cost function contributions
+    print(f"\nCost function analysis:")
+    if use_markers and mRefs.getNames().size() > 0:
+        try:
+            marker_errors = osim.SimTKArrayDouble()
+            ikSolver.computeCurrentMarkerErrors(marker_errors)
+            if marker_errors.size() > 0:
+                # Calculate weighted marker cost (sum of weight * error^2)
+                marker_cost = 0
+                for i in range(marker_errors.size()):
+                    error = marker_errors.getElt(i)
+                    marker_cost += marker_weight * (error ** 2)
+                print(f"  - Weighted marker cost: {marker_cost:.10f}")
+        except:
+            marker_cost = 0
+            print(f"  - Weighted marker cost: Cannot compute")
+    else:
+        marker_cost = 0
+        print(f"  - Weighted marker cost: 0 (no markers)")
+
+    if orientation_weight > 0 and oRefs.getNames().size() > 0:
+        try:
+            orientation_errors = osim.SimTKArrayDouble()
+            ikSolver.computeCurrentOrientationErrors(orientation_errors)
+            if orientation_errors.size() > 0:
+                # Calculate weighted orientation cost
+                orientation_cost = 0
+                for i in range(orientation_errors.size()):
+                    error = orientation_errors.getElt(i)
+                    orientation_cost += orientation_weight * (error ** 2)
+                print(f"  - Weighted orientation cost: {orientation_cost:.10f}")
+        except:
+            orientation_cost = 0
+            print(f"  - Weighted orientation cost: Cannot compute")
+    else:
+        orientation_cost = 0
+        print(f"  - Weighted orientation cost: 0 (disabled)")
+
+    # Determine dominance
+    total_data_cost = marker_cost + orientation_cost
+    if total_data_cost > 0:
+        if marker_cost > 0 and orientation_cost > 0:
+            ratio = marker_cost / orientation_cost
+            if ratio > 1000:
+                print(f"🚨 MARKERS DOMINATE: {ratio:.1f}:1 ratio - orientation weights are ineffective!")
+            elif ratio < 0.001:
+                print(f"🚨 ORIENTATIONS DOMINATE: {1/ratio:.1f}:1 ratio - marker weights are ineffective!")
+            else:
+                print(f"✓ Balanced cost ratio: {ratio:.2f}:1 (markers:orientations)")
+        elif marker_cost > 0:
+            print(f"⚠️  Only markers contributing to cost function")
+        elif orientation_cost > 0:
+            print(f"⚠️  Only orientations contributing to cost function")
+    else:
+        print(f"❌ No cost function data available")
+
+    # Final diagnosis
+    if marker_perfect_fit or orientation_perfect_fit:
+        print(f"\n🚨 DIAGNOSIS: Near-perfect fit detected!")
+        print(f"   This explains why changing weights has no effect.")
+        if marker_perfect_fit:
+            print(f"   → Markers fit so perfectly that orientation weights are irrelevant")
+            print(f"   → Try: marker_weight=1, orientation_weight=1000 to test")
+        if orientation_perfect_fit:
+            print(f"   → Orientations fit so perfectly that marker weights are irrelevant")
+            print(f"   → Try: marker_weight=1000, orientation_weight=1 to test")
+    else:
+        print(f"\n✓ No near-perfect fits detected - weights should be effective")
+
+    print("="*60)
+
+    
+    # print(f"\n=== UPDATING SOLVER WEIGHTS SAFELY ===")
+
+    # # Update orientation weights if orientations are being used
+    # if orientation_weight > 0 and hasattr(oRefs, 'getNames') and oRefs.getNames().size() > 0:
+    #     try:
+    #         # Get the actual number of orientations the solver expects
+    #         solver_num_orientations = oRefs.getNames().size()
+            
+    #         print(f"Updating orientation weights: {solver_num_orientations} orientations")
+    #         orientationWeightsA = osim.SimTKArrayDouble(solver_num_orientations, orientation_weight)
+    #         ikSolver.updateOrientationWeights(orientationWeightsA)
+    #         print(f"✓ Orientation weights updated to {orientation_weight}")
+            
+    #     except Exception as e:
+    #         print(f"Failed to update orientation weights: {e}")
+    #         print("Continuing without weight update...")
+
+    # # Update marker weights if markers are being used  
+    # if use_markers and marker_weight > 0 and markerWeights is not None and mRefs.getNames().size() > 0:
+    #     try:
+    #         # Get the actual number of markers the solver expects
+    #         solver_num_markers = mRefs.getNames().size()
+
+    #         print(f"Updating marker weights: {solver_num_markers} markers")
+    #         markerWeightsA = osim.SimTKArrayDouble(solver_num_markers, marker_weight)
+    #         ikSolver.updateMarkerWeights(markerWeightsA)
+    #         print(f"✓ Marker weights updated to {marker_weight}")
+            
+    #     except Exception as e:
+    #         print(f"Failed to update marker weights: {e}")
+    #         print("Continuing without weight update...")
+
+    # print("="*60)
+
+    # ikSolver.assemble(s);  # Re-assemble after setting weights
     
     # Remove coordinate smoothing to get raw IK results first
     # We'll focus on getting the coordinate system alignment correct
@@ -630,14 +847,14 @@ def main(modelFileName, orientationsFileName):
                 print(f"  Marker weights: Not using markers")
     
         # Check if the solver has both references properly registered
-        try:
-            # Try to get solver info
-            marker_tasks = ikSolver.getNumMarkersInUse() if hasattr(ikSolver, 'getNumMarkersInUse') else 'unknown'
-            orient_tasks = ikSolver.getNumOrientationSensorsInUse() if hasattr(ikSolver, 'getNumOrientationSensorsInUse') else 'unknown'
-            print(f"  - Solver sees {marker_tasks} marker tasks")
-            print(f"  - Solver sees {orient_tasks} orientation tasks")
-        except Exception as e:
-            print(f"  - Cannot query solver tasks: {e}")
+        #try:
+        #    # Try to get solver info
+        #    marker_tasks = ikSolver.getNumMarkersInUse() if hasattr(ikSolver, 'getNumMarkersInUse') else 'unknown'
+        #    orient_tasks = ikSolver.getNumOrientationSensorsInUse() if hasattr(ikSolver, 'getNumOrientationSensorsInUse') else 'unknown'
+        #    print(f"  - Solver sees {marker_tasks} marker tasks")
+        #    print(f"  - Solver sees {orient_tasks} orientation tasks")
+        #except Exception as e:
+        #    print(f"  - Cannot query solver tasks: {e}")
 
         # Set the state to current time
         s.setTime(time_val);
