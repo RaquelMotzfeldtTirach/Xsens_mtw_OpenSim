@@ -1,30 +1,3 @@
-# ----------------------------------------------------------------------- #
-# The OpenSim API is a toolkit for musculoskeletal modeling and           #
-# simulation. See http://opensim.stanford.edu and the NOTICE file         #
-# for more information. OpenSim is developed at Stanford University       #
-# and supported by the US National Institutes of Health (U54 GM072970,    #
-# R24 HD065690) and by DARPA through the Warrior Web program.             #
-#                                                                         #
-# Copyright (c) 2005-2019 Stanford University and the Authors             #
-# Author(s): James Dunne                                                  #
-#                                                                         #
-# Licensed under the Apache License, Version 2.0 (the "License");         #
-# you may not use this file except in compliance with the License.        #
-# You may obtain a copy of the License at                                 #
-# http://www.apache.org/licenses/LICENSE-2.0.                             #
-#                                                                         #
-# Unless required by applicable law or agreed to in writing, software     #
-# distributed under the License is distributed on an "AS IS" BASIS,       #
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or         #
-# implied. See the License for the specific language governing            #
-# permissions and limitations under the License.                          #
-# ----------------------------------------------------------------------- #
-
-# Example code to perform orienation tracking with OpenSense. This
-# script uses the OpenSense library functions and is part of the OpenSense
-# Example files. 
-#
-
 # TODO:
 # clean the code
 # make the code more modular
@@ -41,6 +14,8 @@ import argparse
 import os
 import time
 
+osim.Logger.setLevel(osim.Logger.Level_Debug)
+
 def main(modelFileName, orientationsFileName):
     print(modelFileName)
     print(orientationsFileName)
@@ -49,9 +24,9 @@ def main(modelFileName, orientationsFileName):
     markersFileName = "recordings/subject28/imu_elbow/webcam_elbow.trc"
     
     # Weighting configuration for sensor fusion
-    marker_weight = 15     # Higher weight prioritizes marker data
-    orientation_weight = 100  # Set to ZERO to completely disable IMU orientation influence
-    constraint_var = 100   # IK solver constraint weight: Set the relative weighting for constraints. Use Infinity to identify the strict enforcement of constraints, otherwise any positive weighting will append the constraint errors to the assembly cost which the solver will minimize.
+    marker_weight = 5     # Higher weight prioritizes marker data
+    orientation_weight = 1  # Set to ZERO to completely disable IMU orientation influence
+    constraint_var = 1   # IK solver constraint weight: Set the relative weighting for constraints. Use Infinity to identify the strict enforcement of constraints, otherwise any positive weighting will append the constraint errors to the assembly cost which the solver will minimize.
     
     print(f"Sensor fusion weights: Markers={marker_weight}, Orientations={orientation_weight}")
 
@@ -140,6 +115,10 @@ def main(modelFileName, orientationsFileName):
             markerWeight.setName(str(label))
             markerWeight.setWeight(marker_weight)  # Use configured marker weight
             markerWeights.cloneAndAppend(markerWeight)
+        differentMarkerWeight = osim.MarkerWeight()
+        differentMarkerWeight.setName(str(marker_labels[-1]))  # Use the last marker as an example
+        differentMarkerWeight.setWeight(4200)  # Reduce weight for the last marker
+        markerWeights.set(len(marker_labels)-1, differentMarkerWeight)
             
         print(f"Created marker weights for {markerWeights.getSize()} markers (weight: {marker_weight})")
         use_markers = True
@@ -282,7 +261,11 @@ def main(modelFileName, orientationsFileName):
         orientationWeight.setName(str(label))
         orientationWeight.setWeight(orientation_weight)  # Use configured orientation weight
         orientationWeights.cloneAndAppend(orientationWeight)
-    
+    differentWeight = osim.OrientationWeight()
+    differentWeight.setName(str(orientationData.getColumnLabels()[-1]))
+    differentWeight.setWeight(4200)  # Reduce weight for the last orientation
+    orientationWeights.set(len(orientationData.getColumnLabels())-1, differentWeight)
+
     # Create OrientationsReference with reduced weight to prioritize markers
     if orientation_weight == 0.0:
         # Create an empty OrientationsReference to completely disable orientation constraints
@@ -596,143 +579,143 @@ def main(modelFileName, orientationsFileName):
     print(f"IK Solver initialized and assembled. Starting processing...");
 
     # Add detailed data quality analysis
-    print(f"\n=== DATA QUALITY ANALYSIS ===")
+    # print(f"\n=== DATA QUALITY ANALYSIS ===")
 
-    # Test solver responsiveness at first frame
-    test_time = times[0]
-    s.setTime(test_time)
-    ikSolver.track(s)
+    # # Test solver responsiveness at first frame
+    # test_time = times[0]
+    # s.setTime(test_time)
+    # ikSolver.track(s)
 
-    # Check errors at this time point
-    marker_perfect_fit = False
-    orientation_perfect_fit = False
+    # # Check errors at this time point
+    # marker_perfect_fit = False
+    # orientation_perfect_fit = False
 
-    if use_markers and mRefs.getNames().size() > 0:
-        try:
-            marker_errors = osim.SimTKArrayDouble()
-            ikSolver.computeCurrentMarkerErrors(marker_errors)
-            if marker_errors.size() > 0:
-                marker_error_values = [marker_errors.getElt(i) for i in range(marker_errors.size())]
-                avg_marker_error = sum(marker_error_values) / len(marker_error_values)
-                max_marker_error = max(marker_error_values)
-                min_marker_error = min(marker_error_values)
+    # if use_markers and mRefs.getNames().size() > 0:
+    #     try:
+    #         marker_errors = osim.SimTKArrayDouble()
+    #         ikSolver.computeCurrentMarkerErrors(marker_errors)
+    #         if marker_errors.size() > 0:
+    #             marker_error_values = [marker_errors.getElt(i) for i in range(marker_errors.size())]
+    #             avg_marker_error = sum(marker_error_values) / len(marker_error_values)
+    #             max_marker_error = max(marker_error_values)
+    #             min_marker_error = min(marker_error_values)
                 
-                print(f"Marker errors (meters):")
-                print(f"  - Average: {avg_marker_error:.8f}m")
-                print(f"  - Range: {min_marker_error:.8f}m to {max_marker_error:.8f}m")
-                print(f"  - All values: {[f'{e:.6f}' for e in marker_error_values[:5]]}...")  # Show first 5
+    #             print(f"Marker errors (meters):")
+    #             print(f"  - Average: {avg_marker_error:.8f}m")
+    #             print(f"  - Range: {min_marker_error:.8f}m to {max_marker_error:.8f}m")
+    #             print(f"  - All values: {[f'{e:.6f}' for e in marker_error_values[:5]]}...")  # Show first 5
                 
-                # Check if markers have near-perfect fit
-                if avg_marker_error < 1e-6:  # Less than 1 micrometer
-                    marker_perfect_fit = True
-                    print("🚨 MARKERS HAVE NEAR-PERFECT FIT - This will dominate the solution!")
-                elif avg_marker_error < 1e-4:  # Less than 0.1mm
-                    print("⚠️  Markers have very good fit - may dominate orientation data")
-                else:
-                    print("✓ Markers have reasonable errors")
-            else:
-                print("❌ No marker errors available")
-        except Exception as e:
-            print(f"❌ Cannot compute marker errors: {e}")
+    #             # Check if markers have near-perfect fit
+    #             if avg_marker_error < 1e-6:  # Less than 1 micrometer
+    #                 marker_perfect_fit = True
+    #                 print("🚨 MARKERS HAVE NEAR-PERFECT FIT - This will dominate the solution!")
+    #             elif avg_marker_error < 1e-4:  # Less than 0.1mm
+    #                 print("⚠️  Markers have very good fit - may dominate orientation data")
+    #             else:
+    #                 print("✓ Markers have reasonable errors")
+    #         else:
+    #             print("❌ No marker errors available")
+    #     except Exception as e:
+    #         print(f"❌ Cannot compute marker errors: {e}")
 
-    if orientation_weight > 0 and oRefs.getNames().size() > 0:
-        try:
-            orientation_errors = osim.SimTKArrayDouble()
-            ikSolver.computeCurrentOrientationErrors(orientation_errors)
-            if orientation_errors.size() > 0:
-                orient_error_values = [orientation_errors.getElt(i) for i in range(orientation_errors.size())]
-                avg_orient_error = sum(orient_error_values) / len(orient_error_values)
-                max_orient_error = max(orient_error_values)
-                min_orient_error = min(orient_error_values)
+    # if orientation_weight > 0 and oRefs.getNames().size() > 0:
+    #     try:
+    #         orientation_errors = osim.SimTKArrayDouble()
+    #         ikSolver.computeCurrentOrientationErrors(orientation_errors)
+    #         if orientation_errors.size() > 0:
+    #             orient_error_values = [orientation_errors.getElt(i) for i in range(orientation_errors.size())]
+    #             avg_orient_error = sum(orient_error_values) / len(orient_error_values)
+    #             max_orient_error = max(orient_error_values)
+    #             min_orient_error = min(orient_error_values)
                 
-                print(f"Orientation errors (radians):")
-                print(f"  - Average: {avg_orient_error:.8f}rad ({avg_orient_error*180/3.14159:.6f}°)")
-                print(f"  - Range: {min_orient_error:.8f}rad to {max_orient_error:.8f}rad")
-                print(f"  - All values: {[f'{e:.6f}' for e in orient_error_values[:5]]}...")  # Show first 5
+    #             print(f"Orientation errors (radians):")
+    #             print(f"  - Average: {avg_orient_error:.8f}rad ({avg_orient_error*180/3.14159:.6f}°)")
+    #             print(f"  - Range: {min_orient_error:.8f}rad to {max_orient_error:.8f}rad")
+    #             print(f"  - All values: {[f'{e:.6f}' for e in orient_error_values[:5]]}...")  # Show first 5
                 
-                # Check if orientations have near-perfect fit
-                if avg_orient_error < 1e-6:  # Less than 0.00006 degrees
-                    orientation_perfect_fit = True
-                    print("🚨 ORIENTATIONS HAVE NEAR-PERFECT FIT - This will dominate the solution!")
-                elif avg_orient_error < 1e-4:  # Less than 0.006 degrees
-                    print("⚠️  Orientations have very good fit - may dominate marker data")
-                else:
-                    print("✓ Orientations have reasonable errors")
-            else:
-                print("❌ No orientation errors available")
-        except Exception as e:
-            print(f"❌ Cannot compute orientation errors: {e}")
+    #             # Check if orientations have near-perfect fit
+    #             if avg_orient_error < 1e-6:  # Less than 0.00006 degrees
+    #                 orientation_perfect_fit = True
+    #                 print("🚨 ORIENTATIONS HAVE NEAR-PERFECT FIT - This will dominate the solution!")
+    #             elif avg_orient_error < 1e-4:  # Less than 0.006 degrees
+    #                 print("⚠️  Orientations have very good fit - may dominate marker data")
+    #             else:
+    #                 print("✓ Orientations have reasonable errors")
+    #         else:
+    #             print("❌ No orientation errors available")
+    #     except Exception as e:
+    #         print(f"❌ Cannot compute orientation errors: {e}")
 
-    # Analyze cost function contributions
-    print(f"\nCost function analysis:")
-    if use_markers and mRefs.getNames().size() > 0:
-        try:
-            marker_errors = osim.SimTKArrayDouble()
-            ikSolver.computeCurrentMarkerErrors(marker_errors)
-            if marker_errors.size() > 0:
-                # Calculate weighted marker cost (sum of weight * error^2)
-                marker_cost = 0
-                for i in range(marker_errors.size()):
-                    error = marker_errors.getElt(i)
-                    marker_cost += marker_weight * (error ** 2)
-                print(f"  - Weighted marker cost: {marker_cost:.10f}")
-        except:
-            marker_cost = 0
-            print(f"  - Weighted marker cost: Cannot compute")
-    else:
-        marker_cost = 0
-        print(f"  - Weighted marker cost: 0 (no markers)")
+    # # Analyze cost function contributions
+    # print(f"\nCost function analysis:")
+    # if use_markers and mRefs.getNames().size() > 0:
+    #     try:
+    #         marker_errors = osim.SimTKArrayDouble()
+    #         ikSolver.computeCurrentMarkerErrors(marker_errors)
+    #         if marker_errors.size() > 0:
+    #             # Calculate weighted marker cost (sum of weight * error^2)
+    #             marker_cost = 0
+    #             for i in range(marker_errors.size()):
+    #                 error = marker_errors.getElt(i)
+    #                 marker_cost += marker_weight * (error ** 2)
+    #             print(f"  - Weighted marker cost: {marker_cost:.10f}")
+    #     except:
+    #         marker_cost = 0
+    #         print(f"  - Weighted marker cost: Cannot compute")
+    # else:
+    #     marker_cost = 0
+    #     print(f"  - Weighted marker cost: 0 (no markers)")
 
-    if orientation_weight > 0 and oRefs.getNames().size() > 0:
-        try:
-            orientation_errors = osim.SimTKArrayDouble()
-            ikSolver.computeCurrentOrientationErrors(orientation_errors)
-            if orientation_errors.size() > 0:
-                # Calculate weighted orientation cost
-                orientation_cost = 0
-                for i in range(orientation_errors.size()):
-                    error = orientation_errors.getElt(i)
-                    orientation_cost += orientation_weight * (error ** 2)
-                print(f"  - Weighted orientation cost: {orientation_cost:.10f}")
-        except:
-            orientation_cost = 0
-            print(f"  - Weighted orientation cost: Cannot compute")
-    else:
-        orientation_cost = 0
-        print(f"  - Weighted orientation cost: 0 (disabled)")
+    # if orientation_weight > 0 and oRefs.getNames().size() > 0:
+    #     try:
+    #         orientation_errors = osim.SimTKArrayDouble()
+    #         ikSolver.computeCurrentOrientationErrors(orientation_errors)
+    #         if orientation_errors.size() > 0:
+    #             # Calculate weighted orientation cost
+    #             orientation_cost = 0
+    #             for i in range(orientation_errors.size()):
+    #                 error = orientation_errors.getElt(i)
+    #                 orientation_cost += orientation_weight * (error ** 2)
+    #             print(f"  - Weighted orientation cost: {orientation_cost:.10f}")
+    #     except:
+    #         orientation_cost = 0
+    #         print(f"  - Weighted orientation cost: Cannot compute")
+    # else:
+    #     orientation_cost = 0
+    #     print(f"  - Weighted orientation cost: 0 (disabled)")
 
-    # Determine dominance
-    total_data_cost = marker_cost + orientation_cost
-    if total_data_cost > 0:
-        if marker_cost > 0 and orientation_cost > 0:
-            ratio = marker_cost / orientation_cost
-            if ratio > 1000:
-                print(f"🚨 MARKERS DOMINATE: {ratio:.1f}:1 ratio - orientation weights are ineffective!")
-            elif ratio < 0.001:
-                print(f"🚨 ORIENTATIONS DOMINATE: {1/ratio:.1f}:1 ratio - marker weights are ineffective!")
-            else:
-                print(f"✓ Balanced cost ratio: {ratio:.2f}:1 (markers:orientations)")
-        elif marker_cost > 0:
-            print(f"⚠️  Only markers contributing to cost function")
-        elif orientation_cost > 0:
-            print(f"⚠️  Only orientations contributing to cost function")
-    else:
-        print(f"❌ No cost function data available")
+    # # Determine dominance
+    # total_data_cost = marker_cost + orientation_cost
+    # if total_data_cost > 0:
+    #     if marker_cost > 0 and orientation_cost > 0:
+    #         ratio = marker_cost / orientation_cost
+    #         if ratio > 1000:
+    #             print(f"🚨 MARKERS DOMINATE: {ratio:.1f}:1 ratio - orientation weights are ineffective!")
+    #         elif ratio < 0.001:
+    #             print(f"🚨 ORIENTATIONS DOMINATE: {1/ratio:.1f}:1 ratio - marker weights are ineffective!")
+    #         else:
+    #             print(f"✓ Balanced cost ratio: {ratio:.2f}:1 (markers:orientations)")
+    #     elif marker_cost > 0:
+    #         print(f"⚠️  Only markers contributing to cost function")
+    #     elif orientation_cost > 0:
+    #         print(f"⚠️  Only orientations contributing to cost function")
+    # else:
+    #     print(f"❌ No cost function data available")
 
-    # Final diagnosis
-    if marker_perfect_fit or orientation_perfect_fit:
-        print(f"\n🚨 DIAGNOSIS: Near-perfect fit detected!")
-        print(f"   This explains why changing weights has no effect.")
-        if marker_perfect_fit:
-            print(f"   → Markers fit so perfectly that orientation weights are irrelevant")
-            print(f"   → Try: marker_weight=1, orientation_weight=1000 to test")
-        if orientation_perfect_fit:
-            print(f"   → Orientations fit so perfectly that marker weights are irrelevant")
-            print(f"   → Try: marker_weight=1000, orientation_weight=1 to test")
-    else:
-        print(f"\n✓ No near-perfect fits detected - weights should be effective")
+    # # Final diagnosis
+    # if marker_perfect_fit or orientation_perfect_fit:
+    #     print(f"\n🚨 DIAGNOSIS: Near-perfect fit detected!")
+    #     print(f"   This explains why changing weights has no effect.")
+    #     if marker_perfect_fit:
+    #         print(f"   → Markers fit so perfectly that orientation weights are irrelevant")
+    #         print(f"   → Try: marker_weight=1, orientation_weight=1000 to test")
+    #     if orientation_perfect_fit:
+    #         print(f"   → Orientations fit so perfectly that marker weights are irrelevant")
+    #         print(f"   → Try: marker_weight=1000, orientation_weight=1 to test")
+    # else:
+    #     print(f"\n✓ No near-perfect fits detected - weights should be effective")
 
-    print("="*60)
+    # print("="*60)
 
     
     # print(f"\n=== UPDATING SOLVER WEIGHTS SAFELY ===")
@@ -788,79 +771,15 @@ def main(modelFileName, orientationsFileName):
         # Show progress every 10 frames or at the end
         if i % 10 == 0 or i == numTimeSteps - 1:
             print(f"Processing frame {i+1}/{numTimeSteps}: {time_val:.4f}s");
-            #Try to get marker errors to verify markers are being used
-            try:
-                if use_markers and marker_weight > 0:
-                    marker_errors = osim.SimTKArrayDouble()
-                    ikSolver.computeCurrentMarkerErrors(marker_errors)
-                    if marker_errors.size() > 0:
-                        total_marker_error = sum(marker_errors.getElt(j) for j in range(marker_errors.size()))
-                        avg_marker_error = total_marker_error / marker_errors.size()
-                        print(f"  Marker error: {avg_marker_error:.6f}m ({marker_errors.size()} markers)")
-                    else:
-                        print(f"  Marker error: No marker data available")
-                else:
-                    print(f"  Marker error: Markers disabled (weight={marker_weight})")
-            except Exception as e:
-                print(f"  Marker error: Cannot compute ({e})")
             
-            
-            # Same for orientation errors
-            try:
-                if orientation_weight > 0:
-                    orientation_errors = osim.SimTKArrayDouble()
-                    ikSolver.computeCurrentOrientationErrors(orientation_errors)
-                    if orientation_errors.size() > 0:
-                        total_orientation_error = sum(orientation_errors.getElt(j) for j in range(orientation_errors.size()))
-                        avg_orientation_error = total_orientation_error / orientation_errors.size()
-                        print(f"  Orientation error: {avg_orientation_error:.6f}rad ({orientation_errors.size()} orientations)")
-                    else:
-                        print(f"  Orientation error: No orientation data available")
-                else:
-                    print(f"  Orientation error: Orientations disabled (weight={orientation_weight})")
-            except Exception as e:
-                print(f"  Orientation error: Cannot compute ({e})")
-
-
-
-            # Show weights - but only if the references have data
-            if orientation_weight > 0.0:
-                try:
-                    read_o_weights = osim.SimTKArrayDouble()
-                    oRefs.getWeights(s, read_o_weights)
-                    first_o_weight = float(read_o_weights.getElt(0))
-                    print(f"  Orientation weights: {first_o_weight}")  # Show first weight
-                except Exception as e:
-                    print(f"  Orientation weights: Cannot query (error: {e})")
-            else:
-                print(f"  Orientation weights: 0.0 (disabled)")
-            
-            if marker_weight > 0.0:
-                try:
-                    read_m_weights = osim.SimTKArrayDouble()
-                    mRefs.getWeights(s, read_m_weights)
-                    first_weight = float(read_m_weights.getElt(0))
-                    print(f"  Marker weights: {first_weight}")  # Show first weight
-                except Exception as e:
-                    print(f"  Marker weights: Cannot query (error: {e})")
-            else:
-                print(f"  Marker weights: Not using markers")
-    
-        # Check if the solver has both references properly registered
-        #try:
-        #    # Try to get solver info
-        #    marker_tasks = ikSolver.getNumMarkersInUse() if hasattr(ikSolver, 'getNumMarkersInUse') else 'unknown'
-        #    orient_tasks = ikSolver.getNumOrientationSensorsInUse() if hasattr(ikSolver, 'getNumOrientationSensorsInUse') else 'unknown'
-        #    print(f"  - Solver sees {marker_tasks} marker tasks")
-        #    print(f"  - Solver sees {orient_tasks} orientation tasks")
-        #except Exception as e:
-        #    print(f"  - Cannot query solver tasks: {e}")
-
         # Set the state to current time
         s.setTime(time_val);
 
         # Track for this time step (assemble is called internally by track)
         ikSolver.track(s);
+
+        if i % 10 == 0:
+            debug_cost_function(ikSolver, s, marker_weight, orientation_weight, use_markers, mRefs, oRefs)
         
         # Get coordinate values from the state and convert rotational coordinates to degrees
         coordValues = osim.Vector(numCoords, 0.0);  # Initialize with size and default value
@@ -884,6 +803,18 @@ def main(modelFileName, orientationsFileName):
     
     print(f"IK processing completed for {numTimeSteps} frames in {elapsed_time:.2f} seconds.");
     
+    error_stats = save_ik_errors_to_mot(
+        ikSolver=ikSolver,
+        times=times,
+        use_markers=use_markers,
+        mRefs=mRefs,
+        oRefs=oRefs,
+        orientation_weight=orientation_weight,
+        resultsDirectory=resultsDirectory,
+        trial_name="inverse_kinematics"
+    )
+
+
     # Save results as .mot file
     motFileName = resultsDirectory + "/inverse_kinematics_results.mot";
     storage.printResult(storage, "inverse_kinematics_results", resultsDirectory, -1, ".mot");
@@ -894,6 +825,371 @@ def main(modelFileName, orientationsFileName):
     # Exit immediately to prevent segmentation fault during OpenSim object destruction
     os._exit(0)
 
+def debug_cost_function(ikSolver, s, marker_weight, orientation_weight, use_markers, mRefs, oRefs):
+    """Debug cost function by computing individual components"""
+    
+    print(f"\n=== DETAILED COST FUNCTION BREAKDOWN ===")
+    
+    total_cost = 0.0
+    
+    # 1. Marker Cost Component
+    marker_cost = 0.0
+    if use_markers and mRefs.getNames().size() > 0 and marker_weight > 0:
+        try:
+            marker_errors = osim.SimTKArrayDouble()
+            ikSolver.computeCurrentMarkerErrors(marker_errors)
+            marker_weights = osim.SimTKArrayDouble()
+            mRefs.getWeights(s, marker_weights)
+            
+            print(f"Marker contributions:")
+            for i in range(marker_errors.size()):
+                error = marker_errors.getElt(i)
+                weight = marker_weights.getElt(i)
+                contribution = weight * (error ** 2)
+                marker_cost += contribution
+                marker_name = str(mRefs.getNames().getElt(i))
+                print(f"  {marker_name}: error={error:.6f}m, weight={weight:.1f}, cost={contribution:.8f}")
+            
+            print(f"  TOTAL MARKER COST: {marker_cost:.8f}")
+            total_cost += marker_cost
+            
+        except Exception as e:
+            print(f"  Cannot compute marker costs: {e}")
+    
+    # 2. Orientation Cost Component  
+    orientation_cost = 0.0
+    if orientation_weight > 0 and oRefs.getNames().size() > 0:
+        try:
+            orientation_errors = osim.SimTKArrayDouble()
+            ikSolver.computeCurrentOrientationErrors(orientation_errors)
+            orientation_weights = osim.SimTKArrayDouble()
+            oRefs.getWeights(s, orientation_weights)
+            
+            print(f"Orientation contributions:")
+            for i in range(orientation_errors.size()):
+                error = orientation_errors.getElt(i)
+                weight = orientation_weights.getElt(i)
+                contribution = weight * (error ** 2)
+                orientation_cost += contribution
+                orientation_name = str(oRefs.getNames().getElt(i))
+                print(f"  {orientation_name}: error={error:.6f}rad, weight={weight:.1f}, cost={contribution:.8f}")
+            
+            print(f"  TOTAL ORIENTATION COST: {orientation_cost:.8f}")
+            total_cost += orientation_cost
+            
+        except Exception as e:
+            print(f"  Cannot compute orientation costs: {e}")
+    
+    # 3. Coordinate Cost Component (if any coordinate references exist)
+    coordinate_cost = 0.0
+    try:
+        # This is harder to get without direct access to coordinate references
+        print(f"Coordinate contributions: [coordinate references not directly accessible]")
+    except Exception as e:
+        print(f"  Cannot compute coordinate costs: {e}")
+    
+    # 4. Constraints Cost Component
+    constraint_cost = 0.0
+    
+    # 4. Try to get total cost from assembler
+    try:
+        # This should give you the total cost function value
+        assembler_accuracy = ikSolver.getAssembler().getAssemblyConditionWeight()
+        #assembler_constraint_var = ikSolver.getAssembler().getSystemConstraintsWeight()
+        #assembler_weights = ikSolver.getAssembler().getAssemblyConditionWeight()
+        #assembler_total_cost = ikSolver.getAssembler().calcCurrentGoal()
+        print(f"\nASSEMBLER STATS:")
+        print(f"  Assembler accuracy: {assembler_accuracy:.8f}")
+        #print(f"  Assembler constraint weight: {assembler_constraint_var:.8f}")
+        #print(f"  Assembler weights: {assembler_weights}")
+
+        print(f"\nCOMPARISON:")
+        #print(f"  Computed total cost: {total_cost:.8f}")
+        #print(f"  Assembler total cost: {assembler_total_cost:.8f}")
+        #print(f"  Difference: {abs(total_cost - assembler_total_cost):.8f}")
+        
+        #if abs(total_cost - assembler_total_cost) > 1e-6:
+        #    print(f"  ⚠️  Large difference suggests missing cost components (constraints, coordinates)")
+        #else:
+        #    print(f"  ✓ Good agreement - cost function breakdown is accurate")
+            
+    except Exception as e:
+        print(f"  Cannot get assembler total cost: {e}")
+    
+    print("="*60)
+    return total_cost
+
+def save_ik_errors_to_mot(ikSolver, times, use_markers, mRefs, oRefs, orientation_weight, resultsDirectory, trial_name="inverse_kinematics"):
+    """
+    Save IK errors (marker and orientation) to MOT files, similar to InverseKinematicsTool.cpp
+    
+    Args:
+        ikSolver: The InverseKinematicsSolver object
+        times: Array of time values
+        use_markers: Boolean indicating if markers are used
+        mRefs: MarkersReference object
+        oRefs: OrientationsReference object  
+        orientation_weight: Weight for orientations
+        resultsDirectory: Directory to save results
+        trial_name: Name prefix for output files
+    """
+    
+    print(f"\n=== SAVING IK ERRORS ===")
+    
+    # Create storage objects for different error types
+    marker_errors_storage = None
+    orientation_errors_storage = None
+    combined_errors_storage = None
+    
+    num_frames = len(times)
+    
+    # Initialize marker error storage if markers are used
+    if use_markers and mRefs.getNames().size() > 0:
+        marker_errors_storage = osim.Storage()
+        marker_errors_storage.setName("Marker Errors from IK")
+        marker_errors_storage.setInDegrees(False)  # Errors are in meters
+        
+        # Set column labels for marker errors (following InverseKinematicsTool pattern)
+        marker_labels = osim.ArrayStr()
+        marker_labels.append("time")
+        marker_labels.append("total_squared_error")
+        marker_labels.append("marker_error_RMS") 
+        marker_labels.append("marker_error_max")
+        marker_labels.append("worst_marker_name")
+        
+        # Add individual marker error columns
+        for i in range(mRefs.getNames().size()):
+            marker_name = str(mRefs.getNames().getElt(i))
+            marker_labels.append(f"{marker_name}_error")
+            
+        marker_errors_storage.setColumnLabels(marker_labels)
+        
+    # Initialize orientation error storage if orientations are used
+    if orientation_weight > 0 and oRefs.getNames().size() > 0:
+        orientation_errors_storage = osim.Storage()
+        orientation_errors_storage.setName("Orientation Errors from IK")
+        orientation_errors_storage.setInDegrees(True)  # Convert radians to degrees
+        
+        # Set column labels for orientation errors
+        orient_labels = osim.ArrayStr()
+        orient_labels.append("time")
+        orient_labels.append("total_squared_error")
+        orient_labels.append("orientation_error_RMS")
+        orient_labels.append("orientation_error_max")
+        orient_labels.append("worst_orientation_name")
+        
+        # Add individual orientation error columns
+        for i in range(oRefs.getNames().size()):
+            orient_name = str(oRefs.getNames().getElt(i))
+            orient_labels.append(f"{orient_name}_error")
+            
+        orientation_errors_storage.setColumnLabels(orient_labels)
+    
+    # Initialize combined error storage
+    combined_errors_storage = osim.Storage()
+    combined_errors_storage.setName("Combined IK Errors")
+    combined_errors_storage.setInDegrees(False)
+    
+    combined_labels = osim.ArrayStr()
+    combined_labels.append("time")
+    combined_labels.append("total_cost")
+    combined_labels.append("marker_cost")
+    combined_labels.append("orientation_cost")
+    combined_labels.append("marker_rms_error")
+    combined_labels.append("orientation_rms_error_deg")
+    combined_labels.append("num_markers")
+    combined_labels.append("num_orientations")
+    
+    combined_errors_storage.setColumnLabels(combined_labels)
+    
+    print(f"Processing {num_frames} frames for error analysis...")
+    
+    # Process each frame and collect errors
+    for i, time_val in enumerate(times):
+        if i % 50 == 0:  # Show progress every 50 frames
+            print(f"  Processing error frame {i+1}/{num_frames}")
+            
+        # Set time (assuming ikSolver is already tracking this time)
+        # We don't need to call track again since it was called in main loop
+        
+        # === MARKER ERRORS ===
+        marker_cost = 0.0
+        marker_rms = 0.0
+        marker_max = 0.0
+        worst_marker_name = "none"
+        num_markers = 0
+        
+        if use_markers and mRefs.getNames().size() > 0:
+            try:
+                marker_errors = osim.SimTKArrayDouble()
+                ikSolver.computeCurrentMarkerErrors(marker_errors)
+                
+                if marker_errors.size() > 0:
+                    num_markers = marker_errors.size()
+                    
+                    # Calculate statistics (following InverseKinematicsTool.cpp pattern)
+                    total_squared_error = 0.0
+                    max_squared_error = 0.0
+                    worst_idx = -1
+                    
+                    individual_errors = []
+                    
+                    for j in range(marker_errors.size()):
+                        error = marker_errors.getElt(j)
+                        squared_error = error * error
+                        total_squared_error += squared_error
+                        individual_errors.append(error)
+                        
+                        if squared_error > max_squared_error:
+                            max_squared_error = squared_error
+                            worst_idx = j
+                    
+                    marker_rms = math.sqrt(total_squared_error / num_markers) if num_markers > 0 else 0
+                    marker_max = math.sqrt(max_squared_error)
+                    marker_cost = total_squared_error
+                    
+                    if worst_idx >= 0:
+                        try:
+                            worst_marker_name = ikSolver.getMarkerNameForIndex(worst_idx)
+                        except:
+                            worst_marker_name = f"marker_{worst_idx}"
+                    
+                    # Save marker error data
+                    if marker_errors_storage:
+                        marker_data = osim.ArrayDouble()
+                        marker_data.append(total_squared_error)
+                        marker_data.append(marker_rms)
+                        marker_data.append(marker_max)
+                        marker_data.append(0.0)  # Placeholder for worst marker name (can't store strings easily)
+                        
+                        # Add individual marker errors
+                        for error in individual_errors:
+                            marker_data.append(error)
+                            
+                        marker_errors_storage.append(time_val, marker_data)
+                        
+            except Exception as e:
+                print(f"    Warning: Could not compute marker errors at time {time_val}: {e}")
+        
+        # === ORIENTATION ERRORS ===
+        orientation_cost = 0.0
+        orientation_rms = 0.0
+        orientation_max = 0.0
+        worst_orientation_name = "none"
+        num_orientations = 0
+        
+        if orientation_weight > 0 and oRefs.getNames().size() > 0:
+            try:
+                orientation_errors = osim.SimTKArrayDouble()
+                ikSolver.computeCurrentOrientationErrors(orientation_errors)
+                
+                if orientation_errors.size() > 0:
+                    num_orientations = orientation_errors.size()
+                    
+                    # Calculate statistics
+                    total_squared_error = 0.0
+                    max_squared_error = 0.0
+                    worst_idx = -1
+                    
+                    individual_errors = []
+                    
+                    for j in range(orientation_errors.size()):
+                        error = orientation_errors.getElt(j)
+                        squared_error = error * error
+                        total_squared_error += squared_error
+                        individual_errors.append(error)
+                        
+                        if squared_error > max_squared_error:
+                            max_squared_error = squared_error
+                            worst_idx = j
+                    
+                    orientation_rms = math.sqrt(total_squared_error / num_orientations) if num_orientations > 0 else 0
+                    orientation_max = math.sqrt(max_squared_error)
+                    orientation_cost = total_squared_error
+                    
+                    if worst_idx >= 0:
+                        try:
+                            worst_orientation_name = ikSolver.getOrientationSensorNameForIndex(worst_idx)
+                        except:
+                            worst_orientation_name = f"orientation_{worst_idx}"
+                    
+                    # Save orientation error data
+                    if orientation_errors_storage:
+                        orient_data = osim.ArrayDouble()
+                        orient_data.append(total_squared_error)
+                        orient_data.append(orientation_rms * 180.0 / math.pi)  # Convert to degrees
+                        orient_data.append(orientation_max * 180.0 / math.pi)  # Convert to degrees
+                        orient_data.append(0.0)  # Placeholder for worst orientation name
+                        
+                        # Add individual orientation errors (in degrees)
+                        for error in individual_errors:
+                            orient_data.append(error * 180.0 / math.pi)
+                            
+                        orientation_errors_storage.append(time_val, orient_data)
+                        
+            except Exception as e:
+                print(f"    Warning: Could not compute orientation errors at time {time_val}: {e}")
+        
+        # === COMBINED ERRORS ===
+        total_cost = marker_cost + orientation_cost
+        
+        combined_data = osim.ArrayDouble()
+        combined_data.append(total_cost)
+        combined_data.append(marker_cost)
+        combined_data.append(orientation_cost)
+        combined_data.append(marker_rms)
+        combined_data.append(orientation_rms * 180.0 / math.pi if orientation_rms > 0 else 0.0)  # Convert to degrees
+        combined_data.append(float(num_markers))
+        combined_data.append(float(num_orientations))
+        
+        combined_errors_storage.append(time_val, combined_data)
+    
+    # Save all error files
+    try:
+        # Save marker errors
+        if marker_errors_storage and use_markers:
+            marker_filename = f"{trial_name}_ik_marker_errors"
+            osim.Storage.printResult(marker_errors_storage, marker_filename, resultsDirectory, -1, ".mot")
+            print(f"✓ Saved marker errors to: {resultsDirectory}/{marker_filename}.mot")
+        
+        # Save orientation errors  
+        if orientation_errors_storage and orientation_weight > 0:
+            orientation_filename = f"{trial_name}_ik_orientation_errors"
+            osim.Storage.printResult(orientation_errors_storage, orientation_filename, resultsDirectory, -1, ".mot")
+            print(f"✓ Saved orientation errors to: {resultsDirectory}/{orientation_filename}.mot")
+        
+        # Save combined errors
+        combined_filename = f"{trial_name}_ik_combined_errors"
+        osim.Storage.printResult(combined_errors_storage, combined_filename, resultsDirectory, -1, ".mot")
+        print(f"✓ Saved combined errors to: {resultsDirectory}/{combined_filename}.mot")
+        
+        # Print summary statistics
+        print(f"\n=== ERROR SUMMARY ===")
+        if use_markers and num_markers > 0:
+            print(f"Markers: {num_markers} tracked")
+            print(f"  - Final RMS error: {marker_rms:.6f} m")
+            print(f"  - Final max error: {marker_max:.6f} m")
+            
+        if orientation_weight > 0 and num_orientations > 0:
+            print(f"Orientations: {num_orientations} tracked")  
+            print(f"  - Final RMS error: {orientation_rms*180/math.pi:.4f}°")
+            print(f"  - Final max error: {orientation_max*180/math.pi:.4f}°")
+            
+        print(f"Total final cost: {total_cost:.8f}")
+        print("="*60)
+        
+    except Exception as e:
+        print(f"Error saving error files: {e}")
+
+    return {
+        'marker_rms': marker_rms,
+        'orientation_rms': orientation_rms * 180.0 / math.pi if orientation_rms > 0 else 0,
+        'total_cost': total_cost,
+        'num_markers': num_markers,
+        'num_orientations': num_orientations
+    }
+
+# Add this to your main processing loop
 if __name__ == "__main__":
     # if arguments are not provided, use default values
     parser = argparse.ArgumentParser(description="Run OpenSense Inverse Kinematics.")
