@@ -131,13 +131,20 @@ class MtwCallback(xda.XsCallback):
 if __name__ == '__main__':
     # Create the argument parser
     parser = argparse.ArgumentParser(description="Record MTw data")
-    parser.add_argument('ID', type=str, help='Subject ID')
-    parser.add_argument('TRIAL', type=str, help='Trial ID')
+    parser.add_argument('--ID', type=str, help='Subject ID', default='')
+    parser.add_argument('--TRIAL', type=str, help='Trial ID', default='')
+    parser.add_argument('--NB_IMUS', type=str, help='Number of expected IMUS', default='')
 
     # Parse the arguments
     args = parser.parse_args()
     SUBJECT_ID = args.ID
     TRIAL_ID = args.TRIAL
+    NB_IMUS = args.NB_IMUS
+
+    if NB_IMUS != '':
+        nb_imus = int(NB_IMUS)
+    else:
+        nb_imus = int(input("Number of expected IMUs: "))
 
 
     desired_update_rate = 120  # Hz
@@ -206,9 +213,9 @@ if __name__ == '__main__':
             time.sleep(0.1)
             next_count = len(wireless_master_callback.getWirelessMTWs())
             if next_count != connected_mtw_count:
-                print(f"Number of connected MTWs: {next_count}. We expect 9 IMUs")
+                print(f"Number of connected MTWs: {next_count}. We expect {nb_imus} IMUs")
                 connected_mtw_count = next_count
-            if connected_mtw_count != 9:
+            if connected_mtw_count != nb_imus:
                 wait_for_connections = True 
             else: 
                 wait_for_connections = False
@@ -269,8 +276,14 @@ if __name__ == '__main__':
             mtw_devices[i].addCallbackHandler(mtw_callbacks[i])
 
         # Create a folder and a MTB file to save the keypoints
-        id = SUBJECT_ID
-        mvt_id = TRIAL_ID
+        if SUBJECT_ID != '':
+            id = SUBJECT_ID
+        else: 
+            id = input("Enter the subject ID: ")
+        if TRIAL_ID != '':
+            mvt_id = TRIAL_ID
+        else: 
+            mvt_id = input("Enter the movement description: ")
         logFileName = 'recordings/subject'+ id +'/imu_'+ mvt_id +'.mtb'
         # Create subject## folder
         try:
