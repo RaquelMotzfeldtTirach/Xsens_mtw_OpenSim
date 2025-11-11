@@ -139,10 +139,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     SUBJECT_ID = args.ID
     TRIAL_ID = args.TRIAL
-    NB_IMUS = args.NB_IMUS
+    NUMB_IMUS = args.NB_IMUS
 
-    if NB_IMUS != '':
-        nb_imus = int(NB_IMUS)
+    if NUMB_IMUS != '':
+        nb_imus = int(NUMB_IMUS)
     else:
         nb_imus = int(input("Number of expected IMUs: "))
 
