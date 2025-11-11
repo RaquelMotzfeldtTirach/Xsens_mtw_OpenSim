@@ -27,6 +27,7 @@ import time
 from collections import deque
 from threading import Lock
 from termios import tcflush, TCIFLUSH
+import argparse
 
 #---------Ubuntu may need to set up the pacakge location for XDA and keyboard-----#
 module_path = "/home/raquel/Documents/Xsens/xda_python/my_python3_9_venv/lib/python3.9/site-packages"
@@ -128,6 +129,17 @@ class MtwCallback(xda.XsCallback):
 
 
 if __name__ == '__main__':
+    # Create the argument parser
+    parser = argparse.ArgumentParser(description="Record MTw data")
+    parser.add_argument('ID', type=str, help='Subject ID')
+    parser.add_argument('TRIAL', type=str, help='Trial ID')
+
+    # Parse the arguments
+    args = parser.parse_args()
+    SUBJECT_ID = args.ID
+    TRIAL_ID = args.TRIAL
+
+
     desired_update_rate = 120  # Hz
     desired_radio_channel = 19
 
@@ -194,10 +206,14 @@ if __name__ == '__main__':
             time.sleep(0.1)
             next_count = len(wireless_master_callback.getWirelessMTWs())
             if next_count != connected_mtw_count:
-                print(f"Number of connected MTWs: {next_count}. Press 'Y' to start measurement.")
+                print(f"Number of connected MTWs: {next_count}. We expect 9 IMUs")
                 connected_mtw_count = next_count
+            if connected_mtw_count != 9:
+                wait_for_connections = True 
+            else: 
+                wait_for_connections = False
+                print(f"9 IMUs found")
 
-            wait_for_connections = not keyboard.is_pressed('y')
         tcflush(sys.stdin, TCIFLUSH)
 
         # Check that the update rate is set correctly
@@ -253,8 +269,8 @@ if __name__ == '__main__':
             mtw_devices[i].addCallbackHandler(mtw_callbacks[i])
 
         # Create a folder and a MTB file to save the keypoints
-        id = input("Enter the subject ID (two digits): ")
-        mvt_id = input("Enter the movement description: ")
+        id = SUBJECT_ID
+        mvt_id = TRIAL_ID
         logFileName = 'recordings/subject'+ id +'/imu_'+ mvt_id +'.mtb'
         # Create subject## folder
         try:
@@ -338,8 +354,6 @@ if __name__ == '__main__':
     print("Deleting mtw callbacks...")
 
     print("Successful exit.")
-    print("Press [ENTER] to continue and parse the collected data.")
-    input()
 
     print("Parsing the collected data...")
     # Parse the log file
