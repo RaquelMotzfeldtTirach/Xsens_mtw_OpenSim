@@ -38,6 +38,8 @@ import xsensdeviceapi.xsensdeviceapi_py39_64 as xda
 import keyboard 
 from mtw_parse_logfile import mtw_parsing
 
+import signal
+
 
 class XsPortInfoStr:
     def __str__(self, p):
@@ -127,6 +129,15 @@ class MtwCallback(xda.XsCallback):
                 self.deleteOldestPacket()
 
 
+class GracefulKiller:
+    kill_now = False
+    def __init__(self):
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+    def exit_gracefully(self, signum, frame):
+        self.kill_now = True
+
 
 if __name__ == '__main__':
     # Create the argument parser
@@ -140,6 +151,9 @@ if __name__ == '__main__':
     SUBJECT_ID = args.ID
     TRIAL_ID = args.TRIAL
     NUMB_IMUS = args.NB_IMUS
+
+    # Initialize graceful killer
+    killer = GracefulKiller()
 
     if NUMB_IMUS != '':
         nb_imus = int(NUMB_IMUS)
@@ -200,11 +214,6 @@ if __name__ == '__main__':
             raise RuntimeError(f"Failed to set radio channel: {wireless_master_device}")
 
         print("Waiting for MTW to wirelessly connect...\n")
-
-
-        # This function checks for user input to break the loop
-        def user_input_ready():
-            return False  # Replace this with your method to detect user input
 
 
         wait_for_connections = True
@@ -324,7 +333,7 @@ if __name__ == '__main__':
         euler_data = [xda.XsEuler()] * len(mtw_callbacks)
         print_counter = 0
         start_time = time.time()
-        while not user_input_ready():
+        while not killer.kill_now:
             time.sleep(0)
 
             new_data_available = False
@@ -374,3 +383,5 @@ if __name__ == '__main__':
 
     folderName = logFileName.removesuffix('.mtb') + '/' 
     print("Data saved to " + folderName)
+
+    sys.exit()
