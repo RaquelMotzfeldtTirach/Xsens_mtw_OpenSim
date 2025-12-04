@@ -28,6 +28,7 @@ from collections import deque
 from threading import Lock
 from termios import tcflush, TCIFLUSH
 import argparse
+import threading
 
 #---------Ubuntu may need to set up the pacakge location for XDA and keyboard-----#
 module_path = "/home/raquel/Documents/Xsens/xda_python/my_python3_9_venv/lib/python3.9/site-packages"
@@ -215,6 +216,9 @@ if __name__ == '__main__':
 
         print("Waiting for MTW to wirelessly connect...\n")
 
+        def user_input_ready():
+            return False 
+
 
         wait_for_connections = True
         connected_mtw_count = len(wireless_master_callback.getWirelessMTWs())
@@ -230,7 +234,7 @@ if __name__ == '__main__':
                 wait_for_connections = False
                 print(f"9 IMUs found")
 
-        tcflush(sys.stdin, TCIFLUSH)
+        #tcflush(sys.stdin, TCIFLUSH)
 
         # Check that the update rate is set correctly
         print("Getting the list of the supported update rates...")
@@ -359,9 +363,9 @@ if __name__ == '__main__':
         if not wireless_master_device.gotoConfig():
             raise RuntimeError(f"Failed to goto config mode: {wireless_master_device}")
 
-        print("Disabling radio...")
-        if not wireless_master_device.disableRadio():
-            raise RuntimeError(f"Failed to disable radio: {wireless_master_device}")
+        #print("Disabling radio...")
+        #if not wireless_master_device.disableRadio():
+        #    raise RuntimeError(f"Failed to disable radio: {wireless_master_device}")
 
     except Exception as ex:
         print(ex)
@@ -371,7 +375,7 @@ if __name__ == '__main__':
         print("****ABORT****")
 
     print("Closing XsControl...")
-    control.close()
+    #control.close()
 
     print("Deleting mtw callbacks...")
 
@@ -384,4 +388,5 @@ if __name__ == '__main__':
     folderName = logFileName.removesuffix('.mtb') + '/' 
     print("Data saved to " + folderName)
 
-    sys.exit()
+
+    #sys.exit()
