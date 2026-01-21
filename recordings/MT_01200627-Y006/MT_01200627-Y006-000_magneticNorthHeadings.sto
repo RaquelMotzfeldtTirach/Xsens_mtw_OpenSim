@@ -1,6 +1,0 @@
-DataRate=100.000000
-DataType=Vec3
-version=3
-OpenSimVersion=4.5-2024-07-10-f38669b70
-endheader
-time	torso_imu	pelvis_imu	humerus_r_imu	radius_r_imu	radius_l_imu	humerus_l_imu	hand_r_imu	hand_l_imu
